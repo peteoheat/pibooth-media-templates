@@ -88,3 +88,38 @@ def test_preset_slots_stay_inside_the_canvas(preset, count):
 def test_folder_template_resolves_relative_paths(examples):
     template = load_template(str(examples / 'night_single'))
     assert template.background.startswith(str(examples / 'night_single'))
+
+
+def test_icon_defaults_follow_the_type(tmp_path):
+    from pibooth_media_templates.icons import DEFAULT_ICONS
+    for kind, icon in DEFAULT_ICONS.items():
+        extra = "\ncaptures: 2" if kind in ('animation', 'video', 'wigglegram') else ""
+        extra += "\nlayout: {preset: grid}" if kind == 'collage' else ""
+        template = load_template(write(tmp_path, "type: {}{}".format(kind, extra), kind + '.yaml'))
+        assert template.icon_name == icon and template.icon is None
+
+
+def test_icon_can_be_a_material_name_or_an_image_file(tmp_path):
+    from PIL import Image
+    Image.new('RGBA', (64, 64), (255, 255, 255, 255)).save(tmp_path / 'mine.png')
+    named = load_template(write(tmp_path, "icon: celebration", 'a.yaml'))
+    assert (named.icon, named.icon_name) == (None, 'celebration')
+    pic = load_template(write(tmp_path, "icon: mine.png", 'b.yaml'))
+    assert pic.icon.endswith('mine.png') and pic.icon_name is None
+
+
+def test_unknown_icon_suggests_the_closest_names(tmp_path):
+    with pytest.raises(TemplateError, match="did you mean photo_camera"):
+        load_template(write(tmp_path, "icon: photo_camra"))
+
+
+def test_missing_icon_file_is_an_error(tmp_path):
+    with pytest.raises(TemplateError, match="not found"):
+        load_template(write(tmp_path, "icon: nope.png"))
+
+
+def test_tile_colour(tmp_path):
+    assert load_template(write(tmp_path, "color: '#c0392b'")).color == (192, 57, 43)
+    assert load_template(write(tmp_path, "name: x")).color is None
+    with pytest.raises(TemplateError, match="colour"):
+        load_template(write(tmp_path, "color: notacolour"))

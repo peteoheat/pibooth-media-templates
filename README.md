@@ -22,8 +22,7 @@ On first start nine example templates are written to `~/.config/pibooth/media_te
 ## Using it
 
 * Frosted-glass icon tiles float over the bottom of the wait screen (like photobooth-app's home screen), each with
-  a white pictogram and the template name. **Touch a tile** to pick it and start the sequence. Give a template its
-  own `icon:` image to replace the pictogram.
+  a white icon and the template name. **Touch a tile** to pick it and start the sequence.
 * **Left / right arrow keys** change the selection; your normal capture button starts with the selected template.
 * The choice is kept for the next guest (`keep_selection = False` returns to the default each time).
 * Set `[WINDOW] arrows = top` in pibooth if the bottom arrows clash with the bar, or set `bar_position = top`.
@@ -39,10 +38,23 @@ name: Sunset                 # label under the icon
 enabled: true                # false hides it
 type: single                 # single | collage | animation | video | wigglegram
 captures: 1                  # 1-4 (single is always 1)
-icon: icon.png               # optional, otherwise a pictogram over the background is drawn
+icon: photo_camera           # a Material icon name (see below), or an image file such as icon.png
+color: "#c0392b"             # optional tile colour (default: frosted blue)
 background: background.jpg   # replaces what is behind the guests (needs pibooth-modnet)
 overlay: frame.png           # transparent PNG, stretched over the picture
 ```
+
+**Icons.** As in photobooth-app, `icon` is the name of a Google Material icon: pick one at
+[fonts.google.com/icons](https://fonts.google.com/icons) and use its lower-case name (`celebration`,
+`wb_twilight`, `family_restroom`, ...). If you leave it out, the type decides: `photo_camera` (single),
+`auto_awesome_mosaic` (collage), `gif` (animation), `movie` (video), `3d_rotation` (wigglegram). A value containing
+a dot or slash (`icon.png`, `icons/party.png`) is an image file instead; it is cropped to a square and drawn as is, so
+use a white line icon on a transparent background to match. Unknown names are rejected with suggestions
+(`unknown icon 'photo_camra', did you mean photo_camera?`).
+
+The icons come from the classic Material Icons fonts bundled with the plugin (about 2,200 icons, outlined or filled
+via `icon_style`, Apache-2.0). A few newer additions that appear on fonts.google.com, such as `animated_images` and
+`3d`, are not in them; use the older equivalent (`gif`, `3d_rotation`) or an image file.
 
 **Layouts (collage, or any type that needs a canvas).** Use a preset or list slots explicitly:
 
@@ -88,7 +100,7 @@ pibooth-media-templates preview TEMPLATE a.jpg b.jpg -o out/ [--no-background]
 ## Configuration (`[MEDIA_TEMPLATES]`)
 
 `enabled`, `templates_path`, `disabled` (names, comma separated), `default`, `keep_selection`, `bar_position`,
-`bar_height` (default 0.2 of the window), `show_labels`, plus `model_path`, `inference_size`, `threads`, `refine_edges` for backgrounds (the
+`bar_height` (default 0.2 of the window), `show_labels`, `icon_style` (`outlined` or `filled`), plus `model_path`, `inference_size`, `threads`, `refine_edges` for backgrounds (the
 model file is shared with pibooth-modnet).
 
 ## Limits to know about
@@ -107,3 +119,8 @@ model file is shared with pibooth-modnet).
 ```bash
 pip install -e .[test] pibooth pytest && pytest
 ```
+
+## Third-party
+
+The bundled icon fonts are Google's [Material Icons](https://github.com/google/material-design-icons), licensed under
+the Apache License 2.0 (`pibooth_media_templates/data/LICENSE-material-icons.txt`).

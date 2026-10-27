@@ -34,7 +34,7 @@ from .media import generate_media, media_stem
 from .ui import TemplateBar
 from .examples import write_examples
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 SECTION = 'MEDIA_TEMPLATES'
 
@@ -135,6 +135,8 @@ def pibooth_configure(cfg):
                    "Height of the icon bar as a fraction of the window height")
     cfg.add_option(SECTION, 'show_labels', True,
                    "Show the template name under each icon", "Show names", ['True', 'False'])
+    cfg.add_option(SECTION, 'icon_style', 'outlined',
+                   "Style of the Material icons on the tiles", "Icon style", ['outlined', 'filled'])
     cfg.add_option(SECTION, 'model_path', '~/.config/pibooth/models/modnet.onnx',
                    "MODNet model used to replace backgrounds (shared with pibooth-modnet)")
     cfg.add_option(SECTION, 'inference_size', 512,
@@ -176,7 +178,8 @@ def pibooth_startup(cfg, app):
     CTRL.keep_selection = cfg.getboolean(SECTION, 'keep_selection')
     CTRL.bar = TemplateBar(templates, cfg.get(SECTION, 'bar_position').strip().lower(),
                            min(0.5, max(0.1, cfg.getfloat(SECTION, 'bar_height'))),
-                           cfg.getboolean(SECTION, 'show_labels'))
+                           cfg.getboolean(SECTION, 'show_labels'),
+                           cfg.get(SECTION, 'icon_style').strip().lower())
     LOGGER.info("Media templates: %d template(s): %s", len(templates), ", ".join(t.name for t in templates))
 
     CTRL.replacer = BackgroundReplacer(cfg.getpath(SECTION, 'model_path'), cfg.getint(SECTION, 'inference_size'),

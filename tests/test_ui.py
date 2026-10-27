@@ -103,3 +103,37 @@ def test_bar_follows_a_repaint_of_the_screen(templates):
     area = pygame.Rect(bar.rect((1024, 600)))
     corner = screen.get_at((area.left + 2, area.bottom - 2))
     assert tuple(corner)[:3] == (200, 30, 30)  # new backdrop, not the old scene
+
+
+def test_material_icons_render_in_both_styles():
+    from pibooth_media_templates import icons
+    for style in icons.STYLES:
+        image = icons.render_material_icon('photo_camera', 64, style=style)
+        assert image.size == (64, 64) and image.getchannel('A').getbbox() is not None
+    # A name that only exists in the filled font still draws in outlined mode
+    only_filled = sorted(set(icons.codepoints('filled')) - set(icons.codepoints('outlined')))[0]
+    assert icons.render_material_icon(only_filled, 32).getchannel('A').getbbox() is not None
+
+
+def test_every_default_icon_exists():
+    from pibooth_media_templates import icons
+    for name in icons.DEFAULT_ICONS.values():
+        assert icons.is_icon_name(name), name
+
+
+def test_custom_tile_colour_is_used(templates):
+    pygame.init()
+    screen = pygame.display.set_mode((1024, 600))
+    screen.fill((120, 120, 120))
+    bar = TemplateBar(templates, 'bottom', 0.2)
+    bar.templates[0].color = (200, 0, 0)
+
+    class Win:
+        surface = screen
+    bar.draw(pygame, Win, 5)  # tile 0 is not selected
+    area = pygame.Rect(bar.rect((1024, 600)))
+    first, rects = compute_layout(len(templates), 5, area.width, area.height)
+    x, y, w, h = rects[0 - first] if first == 0 else rects[0]
+    r, g, b = screen.get_at((area.left + x + 6, area.top + y + h // 2))[:3]
+    assert r > g + 40 and r > b + 40  # red tint, not the default blue
+    bar.templates[0].color = None

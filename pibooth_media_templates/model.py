@@ -13,6 +13,9 @@ import logging
 import yaml
 from PIL import ImageColor
 
+from . import icons
+from .icons import DEFAULT_ICONS
+
 LOGGER = logging.getLogger("pibooth-media-templates")
 
 TYPES = ('single', 'collage', 'animation', 'video', 'wigglegram')
@@ -122,7 +125,8 @@ class Template(object):
         if self.type not in TYPES:
             raise TemplateError("type must be one of {}, not '{}'".format(', '.join(TYPES), self.type))
 
-        self.icon = self._path(data.get('icon'))
+        self.icon, self.icon_name = self._icon(data.get('icon'))
+        self.color = _color(data['color'], 'color') if data.get('color') else None  # tile tint
         self.overlay = self._path(data.get('overlay'))
         self.background = self._background(data.get('background'))
 
@@ -196,6 +200,23 @@ class Template(object):
         if not osp.isfile(path):
             raise TemplateError("file not found: {}".format(path))
         return path
+
+    def _icon(self, value):
+        """An icon is a Material icon name (``photo_camera``) or an image file.
+
+        :return: (image file or None, material icon name or None)
+        """
+        if not value:
+            return None, DEFAULT_ICONS[self.type]
+        value = str(value).strip()
+        if '.' in value or '/' in value or '\\' in value:
+            return self._path(value), None
+        if not icons.is_icon_name(value):
+            hint = icons.suggest(value)
+            raise TemplateError("unknown icon '{}'{} (pick a name from https://fonts.google.com/icons, "
+                                "or use an image file)".format(value, ", did you mean {}?".format(
+                                    ' / '.join(hint)) if hint else ''))
+        return None, value
 
     def _background(self, value):
         return False if value is False else self._path(value)

@@ -46,5 +46,8 @@ pibooth_media_templates = "pibooth_media_templates"
 [tool.setuptools]
 packages = ["pibooth_media_templates"]
 
+[tool.setuptools.package-data]
+pibooth_media_templates = ["data/*"]
+
 [tool.setuptools.dynamic]
 version = { attr = "pibooth_media_templates.__version__" }

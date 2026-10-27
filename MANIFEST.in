@@ -1,1 +1,2 @@
 include LICENSE README.md CHANGELOG.md
+recursive-include pibooth_media_templates/data *

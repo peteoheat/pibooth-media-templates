@@ -60,6 +60,7 @@ YAML = {}
 YAML['classic_single'] = """\
 name: Classic
 type: single
+icon: photo_camera             # any name from https://fonts.google.com/icons
 # No background entry: the photo is kept exactly as the camera took it
 overlay: frame.png
 """
@@ -67,12 +68,16 @@ overlay: frame.png
 YAML['sunset_single'] = """\
 name: Sunset
 type: single
+icon: wb_twilight
+color: "#c0392b"                # optional tile colour
 background: background.jpg      # replaces what is behind the guests (needs pibooth-modnet)
 """
 
 YAML['night_single'] = """\
 name: Night Sky
 type: single
+icon: nights_stay
+color: "#2c2c6c"
 background: background.jpg
 overlay: frame.png
 """

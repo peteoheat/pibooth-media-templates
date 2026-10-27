@@ -7,6 +7,8 @@ white outline pictogram and a name, in the style of photobooth-app.
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
+from . import icons
+
 GLASS_TINT = (28, 64, 110)          # frosted blue
 GLASS_TINT_SELECTED = (70, 120, 185)
 GLASS_ALPHA = 0.62
@@ -88,15 +90,20 @@ def _glyph(kind, size):
     return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
-def render_icon(template, size):
-    """Square RGBA icon for a template: its own ``icon`` file if it has one,
-    otherwise a white outline pictogram of its type."""
+def render_icon(template, size, style=icons.DEFAULT_STYLE):
+    """Square RGBA icon for a template: its own image file, otherwise its
+    Material icon (``icon: photo_camera``), otherwise a drawn pictogram."""
     if template.icon:
         try:
             return ImageOps.fit(Image.open(template.icon).convert('RGBA'), (size, size),
                                 Image.Resampling.LANCZOS)
         except OSError:
             pass
+    if template.icon_name:
+        try:
+            return icons.render_material_icon(template.icon_name, size, style=style)
+        except (KeyError, OSError):
+            pass  # Font missing or unreadable: fall back to the drawn pictogram
     return _glyph(template.type, size)
 
 
@@ -121,11 +128,13 @@ class TemplateBar(object):
     selection changes or pibooth repaints the screen underneath.
     """
 
-    def __init__(self, templates, position='bottom', height_ratio=0.2, show_labels=True):
+    def __init__(self, templates, position='bottom', height_ratio=0.2, show_labels=True,
+                 icon_style=icons.DEFAULT_STYLE):
         self.templates = templates
         self.position = position
         self.height_ratio = height_ratio
         self.show_labels = show_labels
+        self.icon_style = icon_style if icon_style in icons.STYLES else icons.DEFAULT_STYLE
         self._icons = {}
         self._font = None
         self._font_key = None
@@ -158,7 +167,7 @@ class TemplateBar(object):
     def _icon_surface(self, pygame, index, size):
         key = (index, size)
         if key not in self._icons:
-            icon = render_icon(self.templates[index], size)
+            icon = render_icon(self.templates[index], size, self.icon_style)
             self._icons[key] = pygame.image.frombuffer(icon.tobytes(), icon.size, 'RGBA').convert_alpha()
         return self._icons[key]
 
@@ -189,7 +198,11 @@ class TemplateBar(object):
         radius = max(6, h // 6)
         scale = 3
         crop = backdrop.crop((x, y, x + w, y + h)).filter(ImageFilter.GaussianBlur(max(4, h // 12)))
-        tint = GLASS_TINT_SELECTED if selected else GLASS_TINT
+        custom = self.templates[index].color
+        if custom:  # the selected tile is the same colour, lightened
+            tint = tuple(int(c + (255 - c) * 0.3) for c in custom) if selected else custom
+        else:
+            tint = GLASS_TINT_SELECTED if selected else GLASS_TINT
         tile = Image.blend(crop, Image.new('RGB', crop.size, tint), GLASS_ALPHA).convert('RGBA')
 
         # Soft light from the top edge
