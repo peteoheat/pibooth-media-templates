@@ -25,7 +25,8 @@ def booth(tmp_path):
     pm = create_plugin_manager()
     # Keep only pibooth's picture plugin: its hookwrapper pushes margin, background,
     # overlay and texts on whatever factory is returned, exactly as in a real booth
-    pm.register(PicturePlugin(pm), name='pibooth-core:picture')
+    picture = PicturePlugin(pm)
+    pm.register(picture, name='pibooth-core:picture')
     pm.register(plugin)  # pluggy validates every hook name and argument against pibooth's specs
 
     cfg = PiConfigParser(str(tmp_path / 'pibooth.cfg'), pm)
@@ -44,7 +45,7 @@ def booth(tmp_path):
     plugin.CTRL.__init__()
     pm.hook.pibooth_reset(cfg=cfg, hard=False)  # writes the examples
     pm.hook.pibooth_startup(cfg=cfg, app=app)
-    yield SimpleNamespace(pm=pm, cfg=cfg, win=win, app=app, hook=pm.hook, tmp=tmp_path)
+    yield SimpleNamespace(pm=pm, cfg=cfg, win=win, app=app, hook=pm.hook, tmp=tmp_path, picture=picture)
     pm.hook.pibooth_cleanup(app=app)
     plugin.CTRL.__init__()
 
@@ -174,3 +175,46 @@ def test_plugin_is_inert_with_no_templates(booth):
     assert not isinstance(build(booth, 4), plugin.MediaTemplateFactory)
     event = pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=(500, 590))
     assert booth.hook.state_wait_validate(cfg=booth.cfg, app=booth.app, win=booth.win, events=[event]) is None
+
+
+def red_pixels(image, box):
+    return sum(1 for r, g, b in image.crop(box).getdata() if r > 200 and g < 60 and b < 60)
+
+
+def test_pibooth_footer_texts_from_the_picture_section_are_drawn(booth):
+    """[PICTURE] footer_text1/2, text_colors, text_fonts, text_alignments and {date} still work."""
+    from datetime import datetime
+    booth.cfg.set('PICTURE', 'footer_text1', '"London Science Museum"')
+    booth.cfg.set('PICTURE', 'footer_text2', '"STEM Skills Fair {date:%Y}"')
+    booth.cfg.set('PICTURE', 'text_colors', '(255, 0, 0)')
+    booth.picture.texts_vars['date'] = datetime(2026, 10, 27, 14, 3, 11)
+    booth.picture.texts_vars['count'] = SimpleNamespace(taken=7)
+
+    pick(booth, 'Classic')          # a single photo: texts are drawn over it
+    factory = build(booth, 1)
+    assert isinstance(factory, plugin.MediaTemplateFactory)
+    assert [t[0] for t in factory._texts] == ["London Science Museum", "STEM Skills Fair 2026"]
+    final = factory.build()
+    assert final.size == (1800, 1200) or final.size == factory._images[0].size
+    width, height = final.size
+    assert red_pixels(final, (0, height - height // 8, width, height)) > 100
+
+
+def test_footer_makes_room_on_a_preset_collage(booth):
+    booth.cfg.set('PICTURE', 'footer_text1', '"London Science Museum"')
+    booth.cfg.set('PICTURE', 'text_colors', '(255, 0, 0)')
+    pick(booth, 'Four Up')
+    final = build(booth, 4).build()
+    assert final.size == (1800, 1200)
+    band = 1200 // 8
+    assert red_pixels(final, (0, 1200 - band, 1800, 1200)) > 100
+
+
+def test_a_template_can_opt_out_of_the_footer(booth):
+    booth.cfg.set('PICTURE', 'footer_text1', '"London Science Museum"')
+    booth.cfg.set('PICTURE', 'text_colors', '(255, 0, 0)')
+    pick(booth, 'Classic')
+    plugin.CTRL.session.footer['mode'] = 'off'
+    final = build(booth, 1).build()
+    width, height = final.size
+    assert red_pixels(final, (0, height - height // 8, width, height)) == 0

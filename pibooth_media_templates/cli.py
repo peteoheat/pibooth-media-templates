@@ -67,7 +67,8 @@ def cmd_preview(args):
     os.makedirs(out_dir, exist_ok=True)
     stem = osp.join(out_dir, osp.basename(osp.dirname(template.source)) if osp.basename(template.source) == 'template.yaml'
                     else osp.splitext(osp.basename(template.source))[0])
-    final, processed = render(template, images, replacer)
+    footer = [(text, None, (0, 0, 0), 'center') for text in args.footer]
+    final, processed = render(template, images, replacer, footer_texts=footer)
     final.save(stem + '.jpg', quality=92)
     print("saved", stem + '.jpg')
     if template.type in MULTI_FRAME_TYPES:
@@ -94,6 +95,8 @@ def main(argv=None):
     preview.add_argument('template', help="template folder or .yaml file")
     preview.add_argument('photos', nargs='+', help="one photo per capture (repeated if fewer)")
     preview.add_argument('-o', '--output', default='.', help="output folder (default: current)")
+    preview.add_argument('--footer', action='append', default=[], metavar='TEXT',
+                         help="footer text like pibooth's footer_text1/2 (give it up to twice)")
     preview.add_argument('--no-background', action='store_true', help="skip background replacement (fast)")
     preview.set_defaults(func=cmd_preview)
 

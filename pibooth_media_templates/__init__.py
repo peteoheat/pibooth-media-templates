@@ -34,7 +34,7 @@ from .media import generate_media, media_stem
 from .ui import TemplateBar
 from .examples import write_examples
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 SECTION = 'MEDIA_TEMPLATES'
 
@@ -104,7 +104,7 @@ class Controller(object):
                 when = datetime.strptime(capture_date, "%Y-%m-%d-%H-%M-%S")
             except ValueError:
                 pass
-        return default_context(self.session, when)
+        return default_context(self.session, when, getattr(self.app, 'count', None))
 
 
 CTRL = Controller()

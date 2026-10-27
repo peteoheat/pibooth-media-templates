@@ -62,7 +62,10 @@ def test_disabled_by_flag_and_by_name(tmp_path):
     ("overlay: nope.png", "not found"),
     ("type: collage\nlayout: {preset: spiral}", "preset"),
     ("type: collage\nslots:\n  - {capture: 3}\ncaptures: 2", "uses capture 3"),
-    ("type: single\ntexts:\n  - {text: hi}", "size"),
+    ("type: single\ntexts:\n  - {text: hi, font_size: 0}", "font_size"),
+    ("type: single\ntexts:\n  - {text: hi, x: left}", "not a number"),
+    ("footer: {mode: sideways}", "footer mode"),
+    ("footer: yes please", "footer must be"),
     ("::: not yaml :::\n  - [", "invalid YAML"),
 ])
 def test_invalid_templates_are_rejected(tmp_path, text, message):
@@ -123,3 +126,25 @@ def test_tile_colour(tmp_path):
     assert load_template(write(tmp_path, "name: x")).color is None
     with pytest.raises(TemplateError, match="colour"):
         load_template(write(tmp_path, "color: notacolour"))
+
+
+def test_texts_work_on_a_single_photo_without_a_size(tmp_path):
+    template = load_template(write(tmp_path, "type: single\ntexts:\n  - {text: hi, y: 0.5, font_size: 40}"))
+    assert template.native and template.size is None
+    assert template.texts[0].font_size == 40 and template.texts[0].y == 0.5
+
+
+def test_footer_setting(tmp_path):
+    assert load_template(write(tmp_path, "name: a", 'a.yaml')).footer['mode'] == 'auto'
+    assert load_template(write(tmp_path, "footer: false", 'b.yaml')).footer['mode'] == 'off'
+    template = load_template(write(tmp_path, "footer: {mode: band, height: 0.2}", 'c.yaml'))
+    assert (template.footer['mode'], template.footer['height']) == ('band', 0.2)
+
+
+def test_preset_layout_can_make_room_for_a_footer(tmp_path):
+    template = load_template(write(tmp_path, "type: collage\ncaptures: 3\nsize: [600, 1800]\n"
+                                             "layout: {preset: strip, margin: 30, gap: 20}"))
+    assert template.has_preset
+    plain, roomy = template.slots_for(0), template.slots_for(300)
+    assert roomy[-1].y + roomy[-1].height <= 1800 - 300 - 30 + 1
+    assert roomy[-1].y + roomy[-1].height < plain[-1].y + plain[-1].height

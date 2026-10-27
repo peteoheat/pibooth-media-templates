@@ -87,10 +87,11 @@ name: Photo Strip
 type: collage
 captures: 3
 size: [600, 1800]               # 2 x 6 inch strip at 300 dpi
-canvas: {color: "#101018"}
-layout: {preset: strip, margin: 30, gap: 20, footer: 0.07}
-texts:
-  - {text: "{date:%d %B %Y}", y: 0.93, h: 0.05, color: "#ffffff"}
+canvas: {color: "#ffffff"}
+layout: {preset: strip, margin: 30, gap: 20}   # room is made for pibooth's footer text automatically
+# footer: false                 # uncomment to ignore the [PICTURE] footer_text1/2 in this template
+# texts:                        # your own texts, placed anywhere on the picture
+#   - {text: "{date:%d %B %Y}", y: 0.02, h: 0.04, color: "#000000"}
 """
 
 YAML['grid_four'] = """\

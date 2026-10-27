@@ -73,13 +73,24 @@ class Slot(object):
 
 class TextItem(object):
 
-    def __init__(self, text, x, y, width, height, color, font, align, rotation):
+    """A text drawn on the finished picture. ``x``, ``y``, ``width`` and
+    ``height`` are kept as written (pixels, or floats from 0 to 1 for a fraction
+    of the picture) and resolved against the real picture size when drawn, so a
+    template needs no fixed size to place text."""
+
+    def __init__(self, text, x, y, width, height, color, font, align, rotation, font_size):
         self.text = text
         self.x, self.y, self.width, self.height = x, y, width, height
         self.color = color
         self.font = font
         self.align = align
         self.rotation = rotation
+        self.font_size = font_size  # pixels; None fits the text to its box
+
+
+def resolve(value, total, what='value'):
+    """Pixels for a number written in a template (see ``_dim``)."""
+    return _dim(value, total, what)
 
 
 def preset_slots(preset, count, size, margin, gap, footer):
@@ -168,13 +179,14 @@ class Template(object):
 
         # Slots
         self.slots = []
+        self._preset = None
         if not self.native:
             if slots_data:
                 self.slots = [self._slot(i, s) for i, s in enumerate(slots_data)]
             else:
-                rects = preset_slots(preset, captures, self.size, int(layout.get('margin', 60)),
-                                     int(layout.get('gap', 30)), layout.get('footer', 0))
-                self.slots = [Slot(i, *rect) for i, rect in enumerate(rects)]
+                self._preset = (preset, self.size, int(layout.get('margin', 60)), int(layout.get('gap', 30)),
+                                layout.get('footer', 0))
+                self.slots = self.slots_for(0)
             for slot in self.slots:
                 if slot.capture >= self.captures:
                     raise TemplateError("slot uses capture {} but the template only takes {}".format(
@@ -183,6 +195,7 @@ class Template(object):
                     raise TemplateError("slot {} has no size".format(slot.capture + 1))
 
         self.texts = [self._text(i, t) for i, t in enumerate(data.get('texts') or [])]
+        self.footer = self._footer(data.get('footer'))
 
         media = data.get(self.type) or {}
         if not isinstance(media, dict):
@@ -240,18 +253,52 @@ class Template(object):
     def _text(self, index, data):
         if not isinstance(data, dict) or 'text' not in data:
             raise TemplateError("text {} needs a 'text' entry".format(index + 1))
-        if self.native and not self.size:
-            raise TemplateError("texts need a 'size' (or slots/layout) so they can be positioned")
-        width, height = self.size
         what = "text {}".format(index + 1)
         align = str(data.get('align', 'center')).lower()
         if align not in ('left', 'center', 'right'):
             raise TemplateError("{}: align must be left, center or right".format(what))
-        return TextItem(str(data['text']),
-                        _dim(data.get('x', 0.0), width, what), _dim(data.get('y', 0.9), height, what),
-                        _dim(data.get('w', 1.0), width, what), _dim(data.get('h', 0.08), height, what),
-                        _color(data.get('color', '#000000'), what), data.get('font'), align,
-                        float(data.get('rotation', 0)))
+        font_size = data.get('font_size')
+        if font_size is not None and (isinstance(font_size, bool) or not isinstance(font_size, int) or font_size < 1):
+            raise TemplateError("{}: font_size must be a whole number of pixels".format(what))
+        for key in ('x', 'y', 'w', 'h'):
+            if key in data:
+                _dim(data[key], 100, "{} {}".format(what, key))  # Fail now on a non-number
+        return TextItem(str(data['text']), data.get('x', 0.0), data.get('y', 0.9), data.get('w'),
+                        data.get('h', 0.08), _color(data.get('color', '#000000'), what), data.get('font'),
+                        align, float(data.get('rotation', 0)), font_size)
+
+    def _footer(self, value):
+        """The ``footer`` setting: where pibooth's [PICTURE] footer texts go.
+
+        :return: dict(mode, height, margin) with mode 'auto', 'band', 'overlay' or 'off'
+        """
+        if value is None or value is True:
+            value = {}
+        elif value is False:
+            value = {'mode': 'off'}
+        if not isinstance(value, dict):
+            raise TemplateError("footer must be true, false or a mapping")
+        mode = str(value.get('mode', 'auto')).lower()
+        if mode not in ('auto', 'band', 'overlay', 'off'):
+            raise TemplateError("footer mode must be auto, band, overlay or off")
+        for key in ('height', 'margin'):
+            if key in value:
+                _dim(value[key], 100, "footer " + key)
+        return {'mode': mode, 'height': value.get('height'), 'margin': value.get('margin')}
+
+    @property
+    def has_preset(self):
+        return self._preset is not None
+
+    def slots_for(self, reserve):
+        """The slots, with at least ``reserve`` pixels kept free at the bottom of a
+        preset layout (explicit slots are placed exactly as written)."""
+        if self._preset is None:
+            return self.slots
+        preset, size, margin, gap, footer = self._preset
+        footer_px = int(round(footer * size[1])) if isinstance(footer, float) and footer <= 1 else int(footer)
+        rects = preset_slots(preset, self.captures, size, margin, gap, max(footer_px, int(reserve)))
+        return [Slot(i, *rect) for i, rect in enumerate(rects)]
 
     # -- queries -------------------------------------------------------------
 

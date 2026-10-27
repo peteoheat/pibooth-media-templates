@@ -87,6 +87,48 @@ itself is the picture (with overlay).
 
 The still picture pibooth shows and prints for these types is the template's layout (or the first capture).
 
+## Text
+
+There are two kinds of text, and they can be used together.
+
+**1. pibooth's footer: `[PICTURE]` in `pibooth.cfg`, unchanged.** `footer_text1`, `footer_text2`, `text_colors`,
+`text_fonts` and `text_alignments` work as before, including `{date}` and `{count}`
+(`footer_text2 = "{date:%d %B %Y}"`). The text is auto-sized to fit, and laid out as in pibooth: two lines stacked
+in a portrait picture, side by side in a landscape one, in a band a sixth (portrait) or an eighth (landscape) of the
+picture's height. Where the band goes depends on the template:
+
+| template | default | what happens |
+|---|---|---|
+| `single`, `animation`... (the capture is the picture) | `overlay` | drawn over the bottom of the photo |
+| collage from a `layout: {preset: ...}` | `band` | the photos make room, so nothing is covered |
+| collage from explicit `slots` | `overlay` | drawn over the bottom of the canvas; leave that area free |
+
+Change it per template with `footer`:
+
+```yaml
+footer: false                       # ignore pibooth's footer text in this template
+footer: {mode: band}                # add a strip under a single photo, in the canvas colour (white by default)
+footer: {mode: overlay, height: 0.15, margin: 40}   # band height / margin: fraction of the picture, or pixels
+```
+
+The footer is a still-picture feature: animations, wigglegrams and videos stay clean, as in photobooth-app. The
+default text colour in `[PICTURE]` is black; set `text_colors = (255, 255, 255)` for white text over photos.
+`margin_thick` and `captures_cropping` no longer apply: a template sets its own `layout.margin` and each slot's `fit`.
+
+**2. A template's own `texts`, as in photobooth-app.** Any number of texts, anywhere on the picture, on any still
+template (a single photo needs no `size`):
+
+```yaml
+texts:
+  - {text: "{date:%d %B %Y}", x: 0.0, y: 0.02, w: 1.0, h: 0.06, align: center, color: "#ffffff"}
+  - {text: "{name} {time}", x: 40, y: 40, font_size: 48, align: left, font: Amatic-Bold, rotation: -5}
+```
+
+`x`, `y`, `w`, `h` are fractions of the picture (floats from 0 to 1) or pixels. Without `font_size` the text is
+fitted to its box; with it, the text is that many pixels tall and `w`/`h` only position it. `font` is a pibooth font
+name or a font file path. Placeholders: `{date}` and `{time}` (as photobooth-app, locale format, or
+`{date:%d %B %Y}`), `{name}` (the template) and pibooth's `{count}`.
+
 ## Command line
 
 ```bash
