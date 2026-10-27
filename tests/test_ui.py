@@ -59,3 +59,47 @@ def test_bar_draws_and_locates(templates):
 
     top = TemplateBar(templates, 'top', 0.18)
     assert top.rect((1024, 600))[1] == 0
+
+
+def _scene(pygame, size=(1024, 600)):
+    screen = pygame.display.set_mode(size)
+    for x in range(0, size[0], 16):
+        for y in range(0, size[1], 16):
+            screen.fill(((x * 7) % 256, (y * 5) % 256, 120), (x, y, 16, 16))
+    return screen
+
+
+def test_glass_tiles_do_not_stack_up_between_frames(templates):
+    pygame.init()
+    screen = _scene(pygame)
+    bar = TemplateBar(templates, 'bottom', 0.2)
+
+    class Win:
+        surface = screen
+    area = pygame.Rect(bar.rect((1024, 600)))
+    before = pygame.image.tobytes(screen.subsurface(area), 'RGB')
+    bar.draw(pygame, Win, 0)
+    once = pygame.image.tobytes(screen.subsurface(area), 'RGB')
+    assert once != before
+    for _ in range(5):          # frames with nothing changed must not alter the picture
+        bar.draw(pygame, Win, 0)
+    assert pygame.image.tobytes(screen.subsurface(area), 'RGB') == once
+
+    bar.draw(pygame, Win, 1)    # changing the selection redraws from the clean backdrop
+    bar.draw(pygame, Win, 0)
+    assert pygame.image.tobytes(screen.subsurface(area), 'RGB') == once
+
+
+def test_bar_follows_a_repaint_of_the_screen(templates):
+    pygame.init()
+    screen = _scene(pygame)
+    bar = TemplateBar(templates, 'bottom', 0.2)
+
+    class Win:
+        surface = screen
+    bar.draw(pygame, Win, 0)
+    screen.fill((200, 30, 30))  # pibooth repaints the wait screen
+    bar.draw(pygame, Win, 0)
+    area = pygame.Rect(bar.rect((1024, 600)))
+    corner = screen.get_at((area.left + 2, area.bottom - 2))
+    assert tuple(corner)[:3] == (200, 30, 30)  # new backdrop, not the old scene

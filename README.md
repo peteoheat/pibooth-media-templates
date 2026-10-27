@@ -21,7 +21,9 @@ On first start nine example templates are written to `~/.config/pibooth/media_te
 
 ## Using it
 
-* Icons appear along the bottom of the wait screen. **Touch an icon** to pick it and start the sequence.
+* Frosted-glass icon tiles float over the bottom of the wait screen (like photobooth-app's home screen), each with
+  a white pictogram and the template name. **Touch a tile** to pick it and start the sequence. Give a template its
+  own `icon:` image to replace the pictogram.
 * **Left / right arrow keys** change the selection; your normal capture button starts with the selected template.
 * The choice is kept for the next guest (`keep_selection = False` returns to the default each time).
 * Set `[WINDOW] arrows = top` in pibooth if the bottom arrows clash with the bar, or set `bar_position = top`.
@@ -86,7 +88,7 @@ pibooth-media-templates preview TEMPLATE a.jpg b.jpg -o out/ [--no-background]
 ## Configuration (`[MEDIA_TEMPLATES]`)
 
 `enabled`, `templates_path`, `disabled` (names, comma separated), `default`, `keep_selection`, `bar_position`,
-`bar_height`, `show_labels`, plus `model_path`, `inference_size`, `threads`, `refine_edges` for backgrounds (the
+`bar_height` (default 0.2 of the window), `show_labels`, plus `model_path`, `inference_size`, `threads`, `refine_edges` for backgrounds (the
 model file is shared with pibooth-modnet).
 
 ## Limits to know about

@@ -131,7 +131,7 @@ def pibooth_configure(cfg):
                    "Keep selection", ['True', 'False'])
     cfg.add_option(SECTION, 'bar_position', 'bottom',
                    "Where the template icons are shown", "Icon bar position", ['bottom', 'top'])
-    cfg.add_option(SECTION, 'bar_height', 0.18,
+    cfg.add_option(SECTION, 'bar_height', 0.2,
                    "Height of the icon bar as a fraction of the window height")
     cfg.add_option(SECTION, 'show_labels', True,
                    "Show the template name under each icon", "Show names", ['True', 'False'])
@@ -175,7 +175,7 @@ def pibooth_startup(cfg, app):
     CTRL.index = CTRL.default_index
     CTRL.keep_selection = cfg.getboolean(SECTION, 'keep_selection')
     CTRL.bar = TemplateBar(templates, cfg.get(SECTION, 'bar_position').strip().lower(),
-                           min(0.5, max(0.08, cfg.getfloat(SECTION, 'bar_height'))),
+                           min(0.5, max(0.1, cfg.getfloat(SECTION, 'bar_height'))),
                            cfg.getboolean(SECTION, 'show_labels'))
     LOGGER.info("Media templates: %d template(s): %s", len(templates), ", ".join(t.name for t in templates))
 
@@ -201,6 +201,7 @@ def state_wait_enter(app, win):
     if not CTRL.keep_selection:
         CTRL.index = CTRL.default_index
     CTRL.apply(app)
+    CTRL.bar.invalidate()  # pibooth has just repainted the wait screen
     CTRL.draw(win)
 
 

@@ -1,40 +1,35 @@
 # -*- coding: utf-8 -*-
-"""The row of template icons shown on the wait screen."""
+"""The row of template tiles shown over the wait screen.
 
-import os.path as osp
+The tiles are frosted-glass rounded squares floating over the scene, with a
+white outline pictogram and a name, in the style of photobooth-app.
+"""
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
-BAR_COLOR = (25, 25, 25)
-TILE_COLOR = (60, 60, 60)
-SELECTED_COLOR = (255, 255, 255)
-TYPE_COLORS = {
-    'single': (66, 133, 244),
-    'collage': (52, 168, 83),
-    'animation': (251, 140, 0),
-    'video': (219, 68, 85),
-    'wigglegram': (142, 84, 233),
-}
-MIN_TILE = 0.65  # a tile is never narrower than this fraction of the bar height
+GLASS_TINT = (28, 64, 110)          # frosted blue
+GLASS_TINT_SELECTED = (70, 120, 185)
+GLASS_ALPHA = 0.62
+WHITE = (255, 255, 255, 255)
 
 
 def compute_layout(count, selected, width, height):
     """Where the tiles go in a bar of ``width`` x ``height`` pixels.
 
-    When there are more templates than fit, a window of tiles that always
-    contains the selected one is shown.
+    Tiles are centred. When there are more templates than fit, a window of
+    tiles that always contains the selected one is shown.
 
     :return: (index of first visible template, [(x, y, w, h) per visible tile])
     """
     if count <= 0:
         return 0, []
-    fit = max(1, int(width // (height * MIN_TILE)))
-    visible = min(count, fit)
+    gap = max(6, height // 12)
+    tile_h = height - gap  # what is left is the margin under the tiles
+    tile_w = int(tile_h * 0.95)
+    visible = min(count, max(1, (width + gap) // (tile_w + gap)))
     first = min(max(0, selected - visible // 2), count - visible)
-    tile_w = min(int(height * 1.35), width // visible)  # Wide enough for a label
-    left = (width - tile_w * visible) // 2
-    pad = max(2, height // 12)
-    rects = [(left + i * tile_w + pad // 2, pad, tile_w - pad, height - 2 * pad) for i in range(visible)]
+    left = (width - (tile_w * visible + gap * (visible - 1))) // 2
+    rects = [(left + i * (tile_w + gap), 0, tile_w, tile_h) for i in range(visible)]
     return first, rects
 
 
@@ -48,86 +43,102 @@ def hit_test(count, selected, width, height, pos):
 
 
 # --------------------------------------------------------------------------
-# Icons
+# Icons: white outline pictograms, drawn 4x larger then reduced for smooth edges
 # --------------------------------------------------------------------------
 
-def _glyph(draw, kind, box, color):
-    """A simple pictogram of the template type, centred in ``box``."""
-    x0, y0, x1, y1 = box
-    w, h = x1 - x0, y1 - y0
-    line = max(2, w // 14)
+def _glyph(kind, size):
+    scale = 4
+    big = size * scale
+    image = Image.new('RGBA', (big, big), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    line = max(2, int(7 * big / 100))
 
-    def rect(a, b, c, d, **kw):
-        draw.rounded_rectangle((x0 + a * w, y0 + b * h, x0 + c * w, y0 + d * h), radius=line, **kw)
+    def u(*values):
+        return [v * big / 100.0 for v in values]
 
-    if kind == 'single':
-        rect(0.2, 0.1, 0.8, 0.9, outline=color, width=line)
-        draw.ellipse((x0 + 0.38 * w, y0 + 0.28 * h, x0 + 0.62 * w, y0 + 0.46 * h), fill=color)
-        draw.pieslice((x0 + 0.3 * w, y0 + 0.5 * h, x0 + 0.7 * w, y0 + 0.95 * h), 180, 360, fill=color)
+    def box(x0, y0, x1, y1, radius=8, **kw):
+        draw.rounded_rectangle(u(x0, y0, x1, y1), radius=radius * big / 100.0, **kw)
+
+    if kind == 'single':  # camera
+        box(8, 30, 92, 86, 10, outline=WHITE, width=line)
+        box(34, 16, 66, 31, 4, outline=WHITE, width=line)
+        draw.ellipse(u(33, 41, 67, 75), outline=WHITE, width=line)
     elif kind == 'collage':
-        for col in (0.1, 0.53):
-            for row in (0.1, 0.53):
-                rect(col, row, col + 0.37, row + 0.37, fill=color)
-    elif kind == 'animation':
-        for i, shift in enumerate((0.0, 0.14, 0.28)):
-            rect(0.1 + shift, 0.2 - shift / 2, 0.52 + shift, 0.62 - shift / 2 + 0.28,
-                 outline=color, width=line, fill=None if i < 2 else color)
-    elif kind == 'video':
-        rect(0.08, 0.25, 0.65, 0.75, fill=color)
-        draw.polygon([(x0 + 0.7 * w, y0 + 0.5 * h), (x0 + 0.95 * w, y0 + 0.3 * h),
-                      (x0 + 0.95 * w, y0 + 0.7 * h)], fill=color)
-    else:  # wigglegram: two offset frames with arrows
-        rect(0.05, 0.25, 0.55, 0.75, outline=color, width=line)
-        rect(0.45, 0.25, 0.95, 0.75, fill=color)
+        box(10, 10, 42, 90, 6, outline=WHITE, width=line)
+        box(54, 10, 90, 44, 6, outline=WHITE, width=line)
+        box(54, 56, 90, 90, 6, outline=WHITE, width=line)
+    elif kind == 'animation':  # GIF
+        box(10, 14, 90, 86, 10, outline=WHITE, width=line)
+        try:
+            font = ImageFont.load_default(size=int(big * 0.34))
+            draw.text(u(50, 51), "GIF", fill=WHITE, font=font, anchor='mm')
+        except (TypeError, ValueError):  # Pillow < 10.1 has no sized default font
+            box(28, 30, 72, 70, 4, outline=WHITE, width=line)
+    elif kind == 'video':  # clapperboard
+        box(12, 40, 88, 88, 6, outline=WHITE, width=line)
+        box(12, 16, 88, 36, 4, outline=WHITE, width=line)
+        for x in (26, 46, 66):
+            draw.polygon(u(x, 16, x + 12, 16, x + 3, 36, x - 9, 36), fill=WHITE)
+    else:  # wigglegram
+        draw.rectangle(u(10, 18, 17, 82), fill=WHITE)
+        draw.rectangle(u(25, 18, 32, 82), fill=WHITE)
+        box(42, 18, 92, 82, 8, outline=WHITE, width=line)
+        draw.polygon(u(50, 74, 63, 52, 71, 63, 77, 55, 85, 74), fill=WHITE)
+        draw.ellipse(u(76, 28, 86, 38), fill=WHITE)
+    return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
 def render_icon(template, size):
-    """Square PIL icon for a template: its own ``icon`` file, otherwise a
-    pictogram over a darkened thumbnail of its background (if any)."""
+    """Square RGBA icon for a template: its own ``icon`` file if it has one,
+    otherwise a white outline pictogram of its type."""
     if template.icon:
         try:
             return ImageOps.fit(Image.open(template.icon).convert('RGBA'), (size, size),
                                 Image.Resampling.LANCZOS)
         except OSError:
             pass
-
-    color = TYPE_COLORS.get(template.type, TILE_COLOR)
-    icon = Image.new('RGBA', (size, size), color + (255,))
-    if template.background and osp.isfile(template.background):
-        try:
-            thumb = ImageOps.fit(Image.open(template.background).convert('RGB'), (size, size),
-                                 Image.Resampling.BILINEAR)
-            icon = ImageEnhance.Brightness(thumb).enhance(0.55).convert('RGBA')
-        except OSError:
-            pass
-    draw = ImageDraw.Draw(icon)
-    margin = size // 5
-    _glyph(draw, template.type, (margin, margin, size - margin, size - margin), (255, 255, 255, 235))
-
-    mask = Image.new('L', (size, size), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, size - 1, size - 1), radius=size // 6, fill=255)
-    icon.putalpha(mask)
-    return icon
+    return _glyph(template.type, size)
 
 
 # --------------------------------------------------------------------------
 # pygame bar
 # --------------------------------------------------------------------------
 
+def _tobytes(pygame, surface):
+    try:
+        return pygame.image.tobytes(surface, 'RGB')
+    except AttributeError:  # pygame < 2.1.3
+        return pygame.image.tostring(surface, 'RGB')
+
+
 class TemplateBar(object):
 
-    """Draws the template tiles at the bottom (or top) of the pibooth window."""
+    """Draws the template tiles over the bottom (or top) of the pibooth window.
 
-    def __init__(self, templates, position='bottom', height_ratio=0.18, show_labels=True):
+    pibooth does not repaint the wait screen every frame, so translucent tiles
+    drawn repeatedly would stack up and turn opaque. The bar therefore keeps a
+    snapshot of the clean screen under the tiles and only redraws them when the
+    selection changes or pibooth repaints the screen underneath.
+    """
+
+    def __init__(self, templates, position='bottom', height_ratio=0.2, show_labels=True):
         self.templates = templates
         self.position = position
         self.height_ratio = height_ratio
         self.show_labels = show_labels
-        self._cache = {}
         self._icons = {}
+        self._font = None
+        self._font_key = None
+        self.invalidate()
+
+    def invalidate(self):
+        """Forget the snapshot, e.g. when the screen has been repainted."""
+        self._backdrop = None
+        self._composed = None
+        self._drawn = None
 
     def bar_height(self, window_height):
-        return max(48, int(window_height * self.height_ratio))
+        return max(64, int(window_height * self.height_ratio))
 
     def rect(self, window_size):
         """(x, y, w, h) of the bar inside a window."""
@@ -142,6 +153,8 @@ class TemplateBar(object):
             return None
         return hit_test(len(self.templates), selected, w, h, (pos[0] - x, pos[1] - y))
 
+    # -- drawing -------------------------------------------------------------
+
     def _icon_surface(self, pygame, index, size):
         key = (index, size)
         if key not in self._icons:
@@ -149,39 +162,92 @@ class TemplateBar(object):
             self._icons[key] = pygame.image.frombuffer(icon.tobytes(), icon.size, 'RGBA').convert_alpha()
         return self._icons[key]
 
-    def surface(self, pygame, window_size, selected):
-        """The bar, drawn once per (size, selection) and cached."""
-        key = (window_size, selected)
-        if key in self._cache:
-            return self._cache[key]
-        self._cache = {key: None}  # Keep only the current one
-        _, _, width, height = self.rect(window_size)
-        bar = pygame.Surface((width, height))
-        bar.fill(BAR_COLOR)
+    def _label_font(self, pygame, w, h):
+        """One font size for every label: the largest at which the longest name still fits."""
+        key = (w, h)
+        if self._font_key != key:
+            fonts = None
+            try:
+                from pibooth import fonts
+            except ImportError:
+                pass
+            best = None
+            for template in self.templates:
+                try:
+                    font = fonts.get_pygame_font(template.name, fonts.CURRENT, w - 12, int(h * 0.27))
+                except Exception:  # No pibooth (command line) or an unreadable font file
+                    font = pygame.font.Font(None, int(h * 0.27))
+                    font.set_bold(True)
+                if best is None or font.get_height() < best.get_height():
+                    best = font
+            self._font, self._font_key = best, key
+        return self._font
 
-        first, rects = compute_layout(len(self.templates), selected, width, height)
-        label_h = int(height * 0.22) if self.show_labels else 0
-        font = pygame.font.Font(None, max(14, label_h)) if self.show_labels else None
-        for offset, (x, y, w, h) in enumerate(rects):
+    def _glass_tile(self, pygame, backdrop, rect, index, selected):
+        """One frosted tile: the blurred scene behind it, tinted, with rounded corners."""
+        x, y, w, h = rect
+        radius = max(6, h // 6)
+        scale = 3
+        crop = backdrop.crop((x, y, x + w, y + h)).filter(ImageFilter.GaussianBlur(max(4, h // 12)))
+        tint = GLASS_TINT_SELECTED if selected else GLASS_TINT
+        tile = Image.blend(crop, Image.new('RGB', crop.size, tint), GLASS_ALPHA).convert('RGBA')
+
+        # Soft light from the top edge
+        shine = Image.linear_gradient('L').resize((w, h)).transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+        light = Image.new('RGBA', (w, h), (255, 255, 255, 0))
+        light.putalpha(shine.point(lambda v: int(v * 0.16)))
+        tile.alpha_composite(light)
+
+        mask = Image.new('L', (w * scale, h * scale), 0)
+        ImageDraw.Draw(mask).rounded_rectangle((0, 0, w * scale - 1, h * scale - 1),
+                                               radius=radius * scale, fill=255)
+        tile.putalpha(mask.resize((w, h), Image.Resampling.LANCZOS))
+        if selected:
+            ring = Image.new('RGBA', (w * scale, h * scale), (0, 0, 0, 0))
+            ImageDraw.Draw(ring).rounded_rectangle((0, 0, w * scale - 1, h * scale - 1), radius=radius * scale,
+                                                   outline=(255, 255, 255, 235), width=3 * scale)
+            tile.alpha_composite(ring.resize((w, h), Image.Resampling.LANCZOS))
+
+        surface = pygame.image.frombuffer(tile.tobytes(), tile.size, 'RGBA').convert_alpha()
+        label_h = int(h * 0.27) if self.show_labels else 0
+        icon_size = max(8, min(w - int(w * 0.3), h - label_h - int(h * 0.12)))
+        icon = self._icon_surface(pygame, index, icon_size)
+        surface.blit(icon, icon.get_rect(midtop=(w // 2, int(h * 0.1))))
+        if self.show_labels:
+            font = self._label_font(pygame, w, h)
+            name = self.templates[index].name
+            label = font.render(name, True, (255, 255, 255))
+            shadow = font.render(name, True, (0, 0, 0))
+            if label.get_width() > w - 8:  # Squeeze long names instead of overflowing
+                size = (w - 8, label.get_height())
+                label = pygame.transform.smoothscale(label, size)
+                shadow = pygame.transform.smoothscale(shadow, size)
+            centre = (w // 2, h - max(4, int(h * 0.15)))
+            shadow.set_alpha(110)
+            surface.blit(shadow, shadow.get_rect(center=(centre[0] + 1, centre[1] + 1)))
+            surface.blit(label, label.get_rect(center=centre))
+        return surface
+
+    def _compose(self, pygame, backdrop, selected):
+        pil = Image.frombytes('RGB', backdrop.get_size(), _tobytes(pygame, backdrop))
+        result = backdrop.copy()
+        first, rects = compute_layout(len(self.templates), selected, *backdrop.get_size())
+        for offset, rect in enumerate(rects):
             index = first + offset
-            is_selected = index == selected
-            tile = pygame.Rect(x, y, w, h)
-            pygame.draw.rect(bar, SELECTED_COLOR if is_selected else TILE_COLOR, tile,
-                             width=0 if is_selected else 2, border_radius=h // 8)
-            icon_size = max(8, min(w, h - label_h) - 2 * max(4, h // 14))
-            icon = self._icon_surface(pygame, index, icon_size)
-            bar.blit(icon, icon.get_rect(midtop=(tile.centerx, tile.top + max(4, h // 14))))
-            if font:
-                name = self.templates[index].name
-                label = font.render(name, True, (20, 20, 20) if is_selected else (235, 235, 235))
-                if label.get_width() > w - 6:  # Squeeze long names instead of overflowing
-                    label = pygame.transform.smoothscale(label, (w - 6, label.get_height()))
-                bar.blit(label, label.get_rect(midbottom=(tile.centerx, tile.bottom - 3)))
-
-        self._cache[key] = bar
-        return bar
+            result.blit(self._glass_tile(pygame, pil, rect, index, index == selected), rect[:2])
+        return result
 
     def draw(self, pygame, win, selected):
-        size = win.surface.get_size()
-        x, y, _, _ = self.rect(size)
-        win.surface.blit(self.surface(pygame, size, selected), (x, y))
+        """Draw the tiles over whatever is on the window, only when needed."""
+        if not self.templates:
+            return
+        screen = win.surface
+        area = pygame.Rect(self.rect(screen.get_size()))
+        current = _tobytes(pygame, screen.subsurface(area))
+        if self._composed is not None and current == self._composed and selected == self._drawn:
+            return  # Nothing changed since the tiles were drawn
+        if self._backdrop is None or current != self._composed or self._backdrop.get_size() != area.size:
+            self._backdrop = screen.subsurface(area).copy()  # pibooth repainted: take a new clean snapshot
+        screen.blit(self._compose(pygame, self._backdrop, selected), area.topleft)
+        self._composed = _tobytes(pygame, screen.subsurface(area))
+        self._drawn = selected
