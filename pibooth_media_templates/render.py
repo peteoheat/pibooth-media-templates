@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """Turn captures into the final still picture of a template."""
 
+import re
 import threading
 import logging
+from collections import namedtuple
 from functools import lru_cache
 from datetime import datetime
 
@@ -302,10 +304,11 @@ def process_captures(template, images, replacer=None):
     return processed
 
 
-def compose(template, processed, context=None, footer_texts=()):
+def compose(template, processed, context=None, footer_texts=(), paper=None):
     """Lay the (already processed) captures out on the template canvas.
 
     :param footer_texts: pibooth's footer texts as (text, font, colour, align)
+    :param paper: a Paper the picture is made for (a single photo then fills its shape)
     """
     context = context or default_context(template)
     footer = [t for t in footer_texts if t[0] is not None]
@@ -316,11 +319,18 @@ def compose(template, processed, context=None, footer_texts=()):
         image = processed[0]
         if template.size:
             image = fit_image(image, template.size[0], template.size[1], 'cover')
+        elif paper is not None and paper.fit != 'contain':
+            # The photo fills the paper (in its own orientation), so the overlay and footer are laid out on
+            # the paper's shape and nothing is cropped or padded afterwards
+            page = paper_pixels(paper, image.width >= image.height)
+            if mode == 'band':
+                band = footer_height(template, page)
+            image = fit_image(image, page[0], page[1] - band, 'cover')
         else:
             image = image.copy()
         if template.overlay:
             image = apply_overlay(image, template.overlay)
-        if mode != 'off':
+        if mode != 'off' and not band:
             band = footer_height(template, image.size)
         if mode == 'band':  # Extend the picture downwards: a frame overlay stays on the photo
             extended = Image.new('RGB', (image.width, image.height + band), template.canvas_color)
@@ -354,13 +364,79 @@ def compose(template, processed, context=None, footer_texts=()):
     return image
 
 
-def render(template, images, replacer=None, context=None, footer_texts=()):
+# --------------------------------------------------------------------------
+# Paper size
+# --------------------------------------------------------------------------
+
+Paper = namedtuple('Paper', 'width_mm height_mm dpi fit')  # portrait size; fit is auto, cover or contain
+
+# Printable (borderless) sizes in mm, portrait. 'postcard' is the Canon SELPHY 100 x 148 mm postcard
+PAPER_MM = {'postcard': (100.0, 148.0), 'l': (89.0, 119.0), 'card': (54.0, 86.0),
+            '4x6': (101.6, 152.4), '5x7': (127.0, 177.8), '6x8': (152.4, 203.2)}
+PAPER_FITS = ('auto', 'cover', 'contain')
+AUTO_CROP_LIMIT = 0.06  # 'auto' crops when the picture is within 6% of the paper's shape, else pads
+_SIZE = re.compile(r'^(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*(mm|in)?$')
+
+
+def parse_paper(text, dpi=300, fit='auto'):
+    """A :class:`Paper` from 'postcard', 'l', 'card', '4x6' (inches), '100x148' (mm) or '4x6in'; None if empty."""
+    text = (text or '').strip().strip('"').lower()
+    if not text or text in ('off', 'none', 'false'):
+        return None
+    fit = (fit or 'auto').strip().strip('"').lower()
+    if fit not in PAPER_FITS:
+        raise ValueError("print_fit must be one of {}, not '{}'".format(', '.join(PAPER_FITS), fit))
+    if text in PAPER_MM:
+        size = PAPER_MM[text]
+    else:
+        match = _SIZE.match(text)
+        if not match:
+            raise ValueError("print_size '{}' is not one of {} or WIDTHxHEIGHT in mm (or 'in')".format(
+                text, ', '.join(sorted(PAPER_MM))))
+        unit = 25.4 if match.group(3) == 'in' else 1.0
+        size = (float(match.group(1)) * unit, float(match.group(2)) * unit)
+    return Paper(min(size), max(size), int(dpi), fit)
+
+
+def paper_pixels(paper, landscape):
+    """Pixel size of the paper at its dpi, in the picture's orientation."""
+    short = int(round(paper.width_mm / 25.4 * paper.dpi))
+    long = int(round(paper.height_mm / 25.4 * paper.dpi))
+    return (long, short) if landscape else (short, long)
+
+
+def fit_to_paper(image, paper, background=(255, 255, 255)):
+    """Resize ``image`` to the exact pixel size of the paper (turned to the picture's orientation) so the
+    printer driver has nothing to scale or crop. A picture close to the paper's shape is cropped a little
+    (``auto``); a very different one, such as a photo strip, is centred on ``background`` instead."""
+    size = paper_pixels(paper, image.width >= image.height)
+    if image.size == size:
+        return image
+    ratio = (image.width / float(image.height)) / (size[0] / float(size[1]))
+    mode = paper.fit
+    if mode == 'auto':
+        mode = 'cover' if abs(ratio - 1) <= AUTO_CROP_LIMIT else 'contain'
+    if mode == 'cover':
+        return fit_image(image, size[0], size[1], 'cover')
+    scale = min(size[0] / float(image.width), size[1] / float(image.height))
+    resized = image.resize((max(1, int(round(image.width * scale))), max(1, int(round(image.height * scale)))),
+                           LANCZOS)
+    page = Image.new('RGB', size, tuple(background)[:3])
+    page.paste(resized, ((size[0] - resized.width) // 2, (size[1] - resized.height) // 2))
+    return page
+
+
+def render(template, images, replacer=None, context=None, footer_texts=(), paper=None):
     """Build the final picture.
 
+    :param paper: a :class:`Paper` to fit the picture to, or None to keep its own size
     :return: (final picture, processed captures)
     """
     processed = process_captures(template, images, replacer)
-    return compose(template, processed, context, footer_texts), processed
+    final = compose(template, processed, context, footer_texts, paper)
+    if paper is not None:
+        final = fit_to_paper(final, paper, template.canvas_color)
+    return final, processed
 
 
 class MediaTemplateFactory(object):
@@ -373,8 +449,9 @@ class MediaTemplateFactory(object):
     replaces (margin, background, overlay, cropping).
     """
 
-    def __init__(self, template, images, replacer=None, context=None):
+    def __init__(self, template, images, replacer=None, context=None, paper=None):
         self.template = template
+        self.paper = paper
         self._images = tuple(images)
         self.replacer = replacer
         self.context = context
@@ -386,12 +463,15 @@ class MediaTemplateFactory(object):
     def build(self, rebuild=False):
         if self._final is None or rebuild:
             self._final, self.processed = render(self.template, self._images, self.replacer, self.context,
-                                                 self._texts)
+                                                 self._texts, self.paper)
         return self._final
 
     def save(self, path):
         image = self.build()
-        image.save(path, quality=95)
+        if self.paper is not None:  # the dpi tells the printer driver the picture's physical size
+            image.save(path, quality=95, dpi=(self.paper.dpi, self.paper.dpi))
+        else:
+            image.save(path, quality=95)
         return image
 
     def add_text(self, text, font_name, color, align='center'):

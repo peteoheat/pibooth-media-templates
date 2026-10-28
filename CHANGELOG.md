@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.6
+
+* New `[MEDIA_TEMPLATES] print_size` / `print_dpi` / `print_fit`: pictures are made at the exact pixel size of the
+  paper (`postcard` is the Canon SELPHY 100 x 148 mm, 1181 x 1748 px at 300 dpi), with the dpi saved in the file.
+  Single photos fill the paper before the overlay and footer are laid out; collages are cropped slightly or centred
+  on the canvas colour, never stretched. `preview --paper SIZE [--dpi N] [--fit MODE]` shows the result.
+
 ## 0.1.5
 
 * Fix: touching a template tile on the right half of the screen also made pibooth print the previous picture

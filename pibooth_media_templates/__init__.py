@@ -32,12 +32,12 @@ except ImportError:  # Allow the command line tools to run without pibooth
     LOGGER = logging.getLogger("pibooth-media-templates")
 
 from .model import load_templates, MULTI_FRAME_TYPES, TemplateError  # noqa: F401
-from .render import BackgroundReplacer, MediaTemplateFactory, default_context
+from .render import BackgroundReplacer, MediaTemplateFactory, default_context, parse_paper
 from .media import generate_media, media_frames, frame_delay, media_stem
 from .ui import TemplateBar
 from .examples import write_examples
 
-__version__ = "0.1.5"
+__version__ = "0.1.6"
 
 SECTION = 'MEDIA_TEMPLATES'
 
@@ -69,7 +69,8 @@ class Controller(object):
         self.player = None        # Player of the last animated picture
         self.forgotten = False
         self.finish_plays = False
-        self.tapped = None        # index of the tile touched, until the wait state validates
+        self.paper = None         # Paper the pictures are fitted to, or None
+        self.tapped = None       # index of the tile touched, until the wait state validates
 
     @property
     def active(self):
@@ -182,6 +183,14 @@ def pibooth_configure(cfg):
                    "Show the template name under each icon", "Show names", ['True', 'False'])
     cfg.add_option(SECTION, 'icon_style', 'outlined',
                    "Style of the Material icons on the tiles", "Icon style", ['outlined', 'filled'])
+    cfg.add_option(SECTION, 'print_size', '',
+                   "Paper the pictures are made for: postcard (Canon SELPHY 100x148 mm), l, card, 4x6, 5x7, "
+                   "or WIDTHxHEIGHT in mm (e.g. 100x148); empty keeps the template's own shape")
+    cfg.add_option(SECTION, 'print_dpi', 300,
+                   "Resolution of the picture made for print_size (the Canon SELPHY CP1300 prints at 300)")
+    cfg.add_option(SECTION, 'print_fit', 'auto',
+                   "How a picture of another shape fills the paper: auto (crop a little, or pad a strip), "
+                   "cover (always crop) or contain (always pad)", "Paper fit", ['auto', 'cover', 'contain'])
     cfg.add_option(SECTION, 'model_path', '~/.config/pibooth/models/modnet.onnx',
                    "MODNet model used to replace backgrounds (shared with pibooth-modnet)")
     cfg.add_option(SECTION, 'inference_size', 512,
@@ -216,6 +225,12 @@ def pibooth_startup(cfg, app):
         LOGGER.warning("Media templates: no usable template in '%s', pibooth keeps its own layouts", folder)
         return
     CTRL.templates = templates
+    try:
+        CTRL.paper = parse_paper(cfg.get(SECTION, 'print_size'), cfg.getint(SECTION, 'print_dpi'),
+                                 cfg.get(SECTION, 'print_fit'))
+    except ValueError as ex:
+        CTRL.paper = None
+        LOGGER.error("Media templates: %s, pictures keep their own shape", ex)
 
     default = cfg.get(SECTION, 'default').strip().lower()
     CTRL.default_index = next((i for i, t in enumerate(templates) if t.name.lower() == default), 0)
@@ -323,7 +338,7 @@ def pibooth_setup_picture_factory(factory):
     images = getattr(factory, '_images', ())
     if len(images) != template.captures:
         return None  # pibooth's per-capture animation frames: leave them to the default factory
-    CTRL.last_factory = MediaTemplateFactory(template, images, CTRL.replacer, CTRL.context())
+    CTRL.last_factory = MediaTemplateFactory(template, images, CTRL.replacer, CTRL.context(), CTRL.paper)
     return CTRL.last_factory
 
 

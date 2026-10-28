@@ -147,7 +147,34 @@ pibooth-media-templates preview TEMPLATE a.jpg b.jpg -o out/ [--no-background]
 
 `enabled`, `templates_path`, `disabled` (names, comma separated), `default`, `keep_selection`, `bar_position`,
 `bar_height` (default 0.2 of the window), `show_labels`, `icon_style` (`outlined` or `filled`), plus `model_path`, `inference_size`, `threads`, `refine_edges` for backgrounds (the
-model file is shared with pibooth-modnet).
+model file is shared with pibooth-modnet), and `print_size`, `print_dpi`, `print_fit` (see below).
+
+## Printing: paper size
+
+pibooth sends the saved picture to CUPS as it is, so a picture of the wrong shape is scaled or cropped by the
+printer driver. Set `print_size` and every still picture is made at the paper's exact pixel size, with the dpi
+stored in the file:
+
+```ini
+[MEDIA_TEMPLATES]
+print_size = postcard     # Canon SELPHY CP1300/CP1500 postcard, 100 x 148 mm borderless
+print_dpi = 300           # what the SELPHY prints at: 1181 x 1748 px (1748 x 1181 in landscape)
+print_fit = auto
+```
+
+`print_size` is `postcard` (100 x 148 mm), `l` (89 x 119), `card` (54 x 86), `4x6`, `5x7`, `6x8` (inches), or
+`WIDTHxHEIGHT` in mm (`100x148`). Orientation follows the picture, so a landscape photo makes a landscape file.
+
+* A **single photo** fills the paper: it is cropped to the paper's shape first, and the frame overlay and footer text
+  are laid out on that shape, so nothing is cut off afterwards.
+* A **collage** keeps the shape its template gives it. Within about 6% of the paper's shape (for example the 6 x 4 in
+  Four Up) it is cropped slightly; a very different one (the 2 x 6 in Photo Strip) is centred on the canvas colour
+  with margins at the sides, never stretched. Make a collage `size` match the paper to use all of it.
+* `print_fit = cover` always crops, `contain` always pads (a photo then keeps its whole frame, with bars).
+
+Leave the CUPS queue on the matching borderless page size (for the SELPHY, "Postcard 100x148mm" borderless) so
+the driver prints the file 1:1. Animations, wigglegrams and videos are unaffected. Try it without the booth:
+`pibooth-media-templates preview TEMPLATE photo.jpg --paper postcard`.
 
 ## Limits to know about
 

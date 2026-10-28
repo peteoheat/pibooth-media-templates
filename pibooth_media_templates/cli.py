@@ -15,7 +15,7 @@ import logging
 from PIL import Image, ImageOps
 
 from .model import load_template, load_templates, TemplateError, MULTI_FRAME_TYPES
-from .render import BackgroundReplacer, render
+from .render import BackgroundReplacer, render, parse_paper
 from .media import generate_media
 from .examples import write_examples
 
@@ -68,8 +68,13 @@ def cmd_preview(args):
     stem = osp.join(out_dir, osp.basename(osp.dirname(template.source)) if osp.basename(template.source) == 'template.yaml'
                     else osp.splitext(osp.basename(template.source))[0])
     footer = [(text, None, (0, 0, 0), 'center') for text in args.footer]
-    final, processed = render(template, images, replacer, footer_texts=footer)
-    final.save(stem + '.jpg', quality=92)
+    try:
+        paper = parse_paper(args.paper, args.dpi, args.fit)
+    except ValueError as ex:
+        print("ERROR", ex)
+        return 1
+    final, processed = render(template, images, replacer, footer_texts=footer, paper=paper)
+    final.save(stem + '.jpg', quality=92, **({'dpi': (paper.dpi, paper.dpi)} if paper else {}))
     print("saved", stem + '.jpg')
     if template.type in MULTI_FRAME_TYPES:
         print("saved", generate_media(template, processed, stem))
@@ -97,6 +102,10 @@ def main(argv=None):
     preview.add_argument('-o', '--output', default='.', help="output folder (default: current)")
     preview.add_argument('--footer', action='append', default=[], metavar='TEXT',
                          help="footer text like pibooth's footer_text1/2 (give it up to twice)")
+    preview.add_argument('--paper', default='', metavar='SIZE',
+                         help="fit the picture to a paper: postcard, l, card, 4x6 or WIDTHxHEIGHT in mm")
+    preview.add_argument('--dpi', type=int, default=300, help="resolution for --paper (default 300)")
+    preview.add_argument('--fit', default='auto', choices=['auto', 'cover', 'contain'], help="how --paper is filled")
     preview.add_argument('--no-background', action='store_true', help="skip background replacement (fast)")
     preview.set_defaults(func=cmd_preview)
 
