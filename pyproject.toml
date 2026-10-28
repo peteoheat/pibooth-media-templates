@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,16 +7,19 @@ name = "pibooth-media-templates"
 dynamic = ["version"]
 description = "pibooth plugin: photobooth-app style media templates (single, collage, animation, video, wigglegram) chosen from an icon bar, each with its own background"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE", "pibooth_media_templates/data/LICENSE-material-icons.txt"]
 requires-python = ">=3.9"
 keywords = ["pibooth", "photobooth", "raspberry pi", "templates", "collage", "wigglegram", "animation"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Other Environment",
     "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Graphics",
 ]
 dependencies = [
@@ -44,10 +47,10 @@ pibooth-media-templates = "pibooth_media_templates.cli:main"
 pibooth_media_templates = "pibooth_media_templates"
 
 [tool.setuptools]
-packages = ["pibooth_media_templates"]
+packages = ["pibooth_media_templates", "pibooth_media_templates.data"]
 
 [tool.setuptools.package-data]
-pibooth_media_templates = ["data/*"]
+"pibooth_media_templates.data" = ["*"]
 
 [tool.setuptools.dynamic]
 version = { attr = "pibooth_media_templates.__version__" }
