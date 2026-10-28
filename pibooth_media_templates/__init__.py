@@ -37,7 +37,7 @@ from .media import generate_media, media_frames, frame_delay, media_stem
 from .ui import TemplateBar
 from .examples import write_examples
 
-__version__ = "0.1.4"
+__version__ = "0.1.5"
 
 SECTION = 'MEDIA_TEMPLATES'
 
@@ -69,6 +69,7 @@ class Controller(object):
         self.player = None        # Player of the last animated picture
         self.forgotten = False
         self.finish_plays = False
+        self.tapped = None        # index of the tile touched, until the wait state validates
 
     @property
     def active(self):
@@ -243,6 +244,7 @@ def pibooth_startup(cfg, app):
 @_plugin_hookimpl(trylast=True)
 def state_wait_enter(app, win):
     CTRL.reset_sequence()
+    CTRL.tapped = None
     if not CTRL.active:
         return
     if not CTRL.keep_selection:
@@ -258,16 +260,37 @@ def state_wait_enter(app, win):
     CTRL.draw(win)
 
 
-@_plugin_hookimpl(trylast=True)
+def _is_tap(event):
+    return (event.type == pygame.MOUSEBUTTONUP and event.button in (1, 2, 3)) or event.type == pygame.FINGERUP
+
+
+def _take_taps(win, events):
+    """Remove the taps that hit a tile from ``events`` (pibooth would read a tap on the right half of the
+    screen as 'print the previous picture') and remember the first tile touched."""
+    size = win.surface.get_size()
+    for event in list(events):
+        if _is_tap(event):
+            index = CTRL.bar.locate(size, CTRL.index, get_event_pos(size, event))
+            if index is not None:
+                events.remove(event)
+                if CTRL.tapped is None:
+                    CTRL.tapped = index
+
+
+@_plugin_hookimpl(hookwrapper=True)
 def state_wait_do(app, win, events):
-    if not CTRL.active:
-        return
-    for event in events:
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_LEFT:
-            CTRL.step(-1, app)
-        elif event.type == pygame.KEYDOWN and event.key == pygame.K_RIGHT:
-            CTRL.step(1, app)
-    CTRL.draw(win)
+    # A wrapper: runs before pibooth's own handlers so they never see the taps on tiles,
+    # and after them so the bar is drawn over what pibooth has just repainted
+    if CTRL.active:
+        for event in events:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_LEFT:
+                CTRL.step(-1, app)
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_RIGHT:
+                CTRL.step(1, app)
+        _take_taps(win, events)
+    yield
+    if CTRL.active:
+        CTRL.draw(win)
 
 
 @_plugin_hookimpl(tryfirst=True)
@@ -275,14 +298,12 @@ def state_wait_validate(cfg, app, win, events):
     """Touching an icon selects that template and starts the sequence."""
     if not CTRL.active:
         return None
-    for event in events:
-        if (event.type == pygame.MOUSEBUTTONUP and event.button in (1, 2, 3)) or event.type == pygame.FINGERUP:
-            size = win.surface.get_size()
-            index = CTRL.bar.locate(size, CTRL.index, get_event_pos(size, event))
-            if index is not None:
-                CTRL.select(index, app)
-                return 'chosen' if cfg.getfloat('WINDOW', 'chosen_delay') > 0 else 'preview'
-    return None
+    _take_taps(win, events)
+    index, CTRL.tapped = CTRL.tapped, None
+    if index is None:
+        return None
+    CTRL.select(index, app)
+    return 'chosen' if cfg.getfloat('WINDOW', 'chosen_delay') > 0 else 'preview'
 
 
 @_plugin_hookimpl

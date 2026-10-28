@@ -298,3 +298,43 @@ def test_still_templates_have_no_player_and_wait_screen_resets_it(booth):
     assert plugin.CTRL.player is None
     for thread in plugin.CTRL.threads:
         thread.join(30)
+
+
+# --- a tap on a tile must never reach pibooth's 'print the previous picture' handler ---
+
+class PrinterSpy(object):
+
+    """Stands in for pibooth's printer plugin: sees the wait events like it does."""
+
+    def __init__(self):
+        self.seen = []
+
+    @pibooth.hookimpl
+    def state_wait_do(self, events):
+        self.seen.extend(events)
+
+
+def test_tap_on_a_tile_is_hidden_from_pibooths_print_handler(booth):
+    spy = PrinterSpy()
+    booth.pm.register(spy)
+    start(booth)
+    # a tile on the right half of the screen, where pibooth would print
+    right = [t.name for t in plugin.CTRL.templates][-1]
+    plugin.CTRL.index = len(plugin.CTRL.templates) - 1
+    tap = tap_on(booth, right)
+    assert tap.pos[0] > booth.win.surface.get_width() // 2
+    events = [tap]
+    booth.hook.state_wait_do(cfg=booth.cfg, app=booth.app, win=booth.win, events=events)
+    assert spy.seen == [] and events == []
+    state = booth.hook.state_wait_validate(cfg=booth.cfg, app=booth.app, win=booth.win, events=events)
+    assert state in ('chosen', 'preview')
+    assert plugin.CTRL.current.name == right
+
+
+def test_taps_off_the_bar_still_reach_pibooth(booth):
+    spy = PrinterSpy()
+    booth.pm.register(spy)
+    start(booth)
+    tap = pygame.event.Event(pygame.MOUSEBUTTONUP, button=1, pos=(900, 100))
+    booth.hook.state_wait_do(cfg=booth.cfg, app=booth.app, win=booth.win, events=[tap])
+    assert spy.seen == [tap]

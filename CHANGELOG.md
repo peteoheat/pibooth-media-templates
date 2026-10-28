@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.5
+
+* Fix: touching a template tile on the right half of the screen also made pibooth print the previous picture
+  (pibooth treats a tap there as the print button). Taps on tiles are now kept from pibooth's handlers.
+
 ## 0.1.4
 
 * Footer text has a contrasting outline, so white text no longer disappears on white margins or bright photos.
