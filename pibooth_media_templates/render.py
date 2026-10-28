@@ -162,15 +162,23 @@ def _fitted_font(text, font_name, width, height):
     return best or _sized_default(6)
 
 
-def _draw_in_box(image, text, font, color, align, rect, rotation=0):
-    """Draw ``text`` in ``rect`` (x, y, w, h): aligned horizontally, centred vertically."""
+def _outline_color(color):
+    """Dark outline for light text, light outline for dark text."""
+    r, g, b = tuple(color)[:3]
+    return (0, 0, 0, 215) if 0.299 * r + 0.587 * g + 0.114 * b > 128 else (255, 255, 255, 215)
+
+
+def _draw_in_box(image, text, font, color, align, rect, rotation=0, outline=0):
+    """Draw ``text`` in ``rect`` (x, y, w, h): aligned horizontally, centred vertically.
+    ``outline`` is the width in pixels of a contrasting outline that keeps the text readable on any colour."""
     x, y, width, height = rect
     layer = Image.new('RGBA', (max(1, width), max(1, height)), (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
-    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+    left, top, right, bottom = draw.textbbox((0, 0), text, font=font, stroke_width=outline)
     text_w, text_h = right - left, bottom - top
     tx = {'left': 0, 'center': (width - text_w) // 2, 'right': width - text_w}[align]
-    draw.text((tx - left, (height - text_h) // 2 - top), text, fill=tuple(color)[:3] + (255,), font=font)
+    draw.text((tx - left, (height - text_h) // 2 - top), text, fill=tuple(color)[:3] + (255,), font=font,
+              stroke_width=outline, stroke_fill=_outline_color(color) if outline else None)
     if rotation:
         layer = layer.rotate(-rotation, expand=True, resample=BICUBIC)
     image.paste(layer, (x - (layer.width - width) // 2, y - (layer.height - height) // 2), layer)
@@ -273,7 +281,9 @@ def draw_footer(image, template, footer_texts, band):
     rects = _footer_rects(len(footer_texts), image.width, image.height, band, margin)
     for (text, font_name, color, align), rect in zip(footer_texts, rects):
         if text.strip():  # An empty text keeps its place, as in pibooth
-            _draw_in_box(image, text, _fitted_font(text, font_name, rect[2], rect[3]), color, align, rect)
+            outline = max(1, rect[3] // 40)  # fitted inside the box, outline included
+            font = _fitted_font(text, font_name, max(1, rect[2] - 2 * outline), max(1, rect[3] - 2 * outline))
+            _draw_in_box(image, text, font, color, align, rect, outline=outline)
 
 
 # --------------------------------------------------------------------------

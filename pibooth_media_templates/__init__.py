@@ -37,7 +37,7 @@ from .media import generate_media, media_frames, frame_delay, media_stem
 from .ui import TemplateBar
 from .examples import write_examples
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 SECTION = 'MEDIA_TEMPLATES'
 

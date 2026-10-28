@@ -110,8 +110,9 @@ captures: 2
 size: [1200, 1800]
 canvas: {color: "#ffffff"}
 slots:                          # each slot can use its own replacement background
-  - {capture: 1, x: 0.05, y: 0.03, w: 0.9, h: 0.46, background: sunset.jpg}
-  - {capture: 2, x: 0.05, y: 0.51, w: 0.9, h: 0.46, background: night.jpg}
+  - {capture: 1, x: 0.05, y: 0.03, w: 0.9, h: 0.38, background: sunset.jpg}
+  - {capture: 2, x: 0.05, y: 0.43, w: 0.9, h: 0.38, background: night.jpg}
+# the bottom sixth is left free for pibooth's footer text
 """
 
 YAML['bounce'] = """\

@@ -103,7 +103,7 @@ picture's height. Where the band goes depends on the template:
 |---|---|---|
 | `single`, `animation`... (the capture is the picture) | `overlay` | drawn over the bottom of the photo |
 | collage from a `layout: {preset: ...}` | `band` | the photos make room, so nothing is covered |
-| collage from explicit `slots` | `overlay` | drawn over the bottom of the canvas; leave that area free |
+| collage from explicit `slots` | `overlay` | drawn over the bottom of the canvas; leave the bottom sixth (portrait) or eighth (landscape) free |
 
 Change it per template with `footer`:
 
@@ -112,6 +112,8 @@ footer: false                       # ignore pibooth's footer text in this templ
 footer: {mode: band}                # add a strip under a single photo, in the canvas colour (white by default)
 footer: {mode: overlay, height: 0.15, margin: 40}   # band height / margin: fraction of the picture, or pixels
 ```
+
+Footer text gets a thin outline in a contrasting colour so it stays readable over photos and white margins alike.
 
 The footer is a still-picture feature: animations, wigglegrams and videos stay clean, as in photobooth-app. The
 default text colour in `[PICTURE]` is black; set `text_colors = (255, 255, 255)` for white text over photos.

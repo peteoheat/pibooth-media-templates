@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.4
+
+* Footer text has a contrasting outline, so white text no longer disappears on white margins or bright photos.
+* The Two Worlds example leaves room for the footer instead of running its photos to the bottom of the canvas.
+
 ## 0.1.3
 
 * Animation, wigglegram and video templates now play their frames on pibooth's print, finish and wait screens
