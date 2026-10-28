@@ -86,6 +86,8 @@ itself is the picture (with overlay).
 | `video` | `fps`, `frame_s`, `fade_s`, `size` | MP4 slideshow with cross-fades |
 
 The still picture pibooth shows and prints for these types is the template's layout (or the first capture).
+On the print, finish and wait screens the frames are played as a loop (the saved `.jpg` is still what is
+printed).
 
 ## Text
 

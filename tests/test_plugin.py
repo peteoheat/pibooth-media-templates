@@ -108,6 +108,7 @@ def test_arrow_keys_cycle_the_selection(booth):
 
 def pick(booth, name):
     start(booth)
+    plugin.CTRL.index = [t.name for t in plugin.CTRL.templates].index(name)  # scroll the bar to it
     booth.hook.state_wait_validate(cfg=booth.cfg, app=booth.app, win=booth.win, events=[tap_on(booth, name)])
     booth.hook.state_wait_exit(cfg=booth.cfg, app=booth.app, win=booth.win)
 
@@ -218,3 +219,82 @@ def test_a_template_can_opt_out_of_the_footer(booth):
     final = build(booth, 1).build()
     width, height = final.size
     assert red_pixels(final, (0, height - height // 8, width, height)) == 0
+
+
+# --- animated templates play on pibooth's print, finish and wait screens ----
+
+class FakeWin(object):
+
+    def __init__(self, surface):
+        self.surface = surface
+        self.shown = []
+
+    def update(self):
+        pass
+
+    def show_print(self, image=None):
+        self.shown.append(('print', image))
+
+    def show_finished(self, image=None):
+        self.shown.append(('finished', image))
+
+    def set_print_number(self, *args):
+        pass
+
+
+def finish_processing(booth, name, count):
+    pick(booth, name)
+    factory = build(booth, count)
+    booth.app.previous_picture = factory.build()
+    booth.app.printer = SimpleNamespace(get_all_tasks=lambda: [], is_ready=lambda: True)
+    booth.app.find_capture_event = lambda events: False
+    booth.hook.state_processing_exit(cfg=booth.cfg, app=booth.app, win=booth.win)
+    return FakeWin(booth.win.surface)
+
+
+@pytest.mark.parametrize('name,count', [('Bounce', 4), ('Wiggle', 3), ('Reel', 4)])
+def test_animated_templates_play_instead_of_the_still(booth, name, count):
+    win = finish_processing(booth, name, count)
+    player = plugin.CTRL.player
+    assert player is not None and len(player.frames) >= count
+    assert booth.app.previous_animated is player.cycle   # wait screen cycles our frames
+
+    booth.hook.state_print_enter(cfg=booth.cfg, app=booth.app, win=win)
+    player.next_at = 0
+    booth.hook.state_print_do(cfg=booth.cfg, app=booth.app, win=win, events=[])
+    booth.hook.state_print_do(cfg=booth.cfg, app=booth.app, win=win, events=[])  # not due yet
+    assert [kind for kind, _ in win.shown] == ['print']
+    assert win.shown[0][1] in player.frames
+
+    booth.cfg.set('WINDOW', 'finish_picture_delay', '1')
+    booth.hook.state_print_validate(cfg=booth.cfg, app=booth.app, win=win, events=[])
+    booth.hook.state_finish_enter(cfg=booth.cfg, app=booth.app, win=win)
+    player.next_at = 0
+    booth.hook.state_finish_do(cfg=booth.cfg, app=booth.app, win=win, events=[])
+    assert win.shown[-1][0] == 'finished'
+    for thread in plugin.CTRL.threads:
+        thread.join(30)
+
+
+def test_a_forgotten_picture_does_not_play_on_the_finish_screen(booth):
+    win = finish_processing(booth, 'Bounce', 4)
+    booth.app.find_capture_event = lambda events: True
+    booth.cfg.set('WINDOW', 'finish_picture_delay', '1')
+    booth.hook.state_print_validate(cfg=booth.cfg, app=booth.app, win=win, events=[])
+    booth.hook.state_finish_enter(cfg=booth.cfg, app=booth.app, win=win)
+    plugin.CTRL.player.next_at = 0
+    booth.hook.state_finish_do(cfg=booth.cfg, app=booth.app, win=win, events=[])
+    assert win.shown == []
+    for thread in plugin.CTRL.threads:
+        thread.join(30)
+
+
+def test_still_templates_have_no_player_and_wait_screen_resets_it(booth):
+    finish_processing(booth, 'Four Up', 4)
+    assert plugin.CTRL.player is None
+    finish_processing(booth, 'Bounce', 4)
+    booth.app.previous_picture = None            # pibooth dropped the picture
+    booth.hook.state_wait_enter(cfg=booth.cfg, app=booth.app, win=booth.win)
+    assert plugin.CTRL.player is None
+    for thread in plugin.CTRL.threads:
+        thread.join(30)

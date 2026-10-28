@@ -187,28 +187,49 @@ def write_video(frames, path, fps=25, hold=1.0, fade=0.3):
 # Entry point
 # --------------------------------------------------------------------------
 
-def generate_media(template, processed, stem):
+def media_frames(template, processed):
+    """The frames of an animation, wigglegram or video template, in playing order.
+
+    :return: list of PIL images, or [] for still-only templates
+    """
+    if template.type not in DEFAULT_SIZE:
+        return []
+    options = template.media
+    frames = build_frames(template, processed)
+    if template.type == 'animation':
+        return ping_pong(frames) if options.get('boomerang', False) else frames
+    if template.type == 'wigglegram':
+        if options.get('align', True):
+            frames = align_frames(frames)
+        return ping_pong(frames)
+    return frames
+
+
+def frame_delay(template):
+    """Seconds each frame of ``media_frames`` stays on screen."""
+    options = template.media
+    if template.type == 'animation':
+        return int(options.get('frame_ms', 500)) / 1000.0
+    if template.type == 'wigglegram':
+        return int(options.get('frame_ms', 120)) / 1000.0
+    return float(options.get('frame_s', 1.0))
+
+
+def generate_media(template, processed, stem, frames=None):
     """Create the extra file of an animation, wigglegram or video template.
 
     :param stem: output path without extension
+    :param frames: result of ``media_frames`` if already computed
     :return: path of the file written, or None for still-only templates
     """
     if template.type not in DEFAULT_SIZE:
         return None  # single and collage templates only produce the still picture
     options = template.media
-    frames = build_frames(template, processed)
+    frames = frames or media_frames(template, processed)
 
-    if template.type == 'animation':
+    if template.type in ('animation', 'wigglegram'):
         fmt = str(options.get('format', 'gif')).lower()
-        if options.get('boomerang', False):
-            frames = ping_pong(frames)
-        return save_animation(frames, '{}.{}'.format(stem, fmt), int(options.get('frame_ms', 500)), fmt)
-
-    if template.type == 'wigglegram':
-        fmt = str(options.get('format', 'gif')).lower()
-        if options.get('align', True):
-            frames = align_frames(frames)
-        return save_animation(ping_pong(frames), '{}.{}'.format(stem, fmt), int(options.get('frame_ms', 120)), fmt)
+        return save_animation(frames, '{}.{}'.format(stem, fmt), int(frame_delay(template) * 1000), fmt)
 
     return write_video(frames, stem + '.mp4', int(options.get('fps', 25)),
                        float(options.get('frame_s', 1.0)), float(options.get('fade_s', 0.3)))

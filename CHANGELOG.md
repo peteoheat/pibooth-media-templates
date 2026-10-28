@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3
+
+* Animation, wigglegram and video templates now play their frames on pibooth's print, finish and wait screens
+  instead of showing only the still picture. Frame speed follows the template (`frame_ms` / `frame_s`); the wait
+  screen uses pibooth's `animate_delay`, and replaces pibooth's un-templated `animate` frames.
+
 ## 0.1.2
 
 * pibooth's `[PICTURE]` footer text works again (`footer_text1/2`, `text_colors`, `text_fonts`, `text_alignments`,

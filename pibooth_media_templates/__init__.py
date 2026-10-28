@@ -14,9 +14,12 @@ See README.md for the template format.
 import sys
 import os.path as osp
 import shutil
+import itertools
 import threading
 import time
 from datetime import datetime
+
+from PIL import Image
 
 try:
     import pygame
@@ -30,11 +33,11 @@ except ImportError:  # Allow the command line tools to run without pibooth
 
 from .model import load_templates, MULTI_FRAME_TYPES, TemplateError  # noqa: F401
 from .render import BackgroundReplacer, MediaTemplateFactory, default_context
-from .media import generate_media, media_stem
+from .media import generate_media, media_frames, frame_delay, media_stem
 from .ui import TemplateBar
 from .examples import write_examples
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 SECTION = 'MEDIA_TEMPLATES'
 
@@ -63,6 +66,9 @@ class Controller(object):
         self.replacer = None
         self.app = None
         self.threads = []
+        self.player = None        # Player of the last animated picture
+        self.forgotten = False
+        self.finish_plays = False
 
     @property
     def active(self):
@@ -105,6 +111,44 @@ class Controller(object):
             except ValueError:
                 pass
         return default_context(self.session, when, getattr(self.app, 'count', None))
+
+
+class Player(object):
+
+    """Plays the frames of an animation, wigglegram or video template on pibooth's
+    print and finish screens, which would otherwise show the still picture only."""
+
+    def __init__(self, still, frames, delay):
+        self.still = still            # the app.previous_picture this belongs to
+        self.frames = frames
+        self.cycle = itertools.cycle(frames)
+        self.delay = max(0.05, delay)
+        self.next_at = 0.0
+
+    def due(self):
+        """True (once per frame delay) when the next frame should be shown."""
+        now = time.time()
+        if now < self.next_at:
+            return False
+        self.next_at = now + self.delay
+        return True
+
+    def restart(self):
+        self.cycle = itertools.cycle(self.frames)
+        self.next_at = time.time() + self.delay  # the first frame is already shown
+
+    @staticmethod
+    def fit(frames, size, share=0.9):
+        """Scale frames down to the window so pibooth does not resize them on every frame."""
+        box = (size[0] * share, size[1] * share)
+        fitted = []
+        for frame in frames:
+            scale = min(1.0, box[0] / frame.width, box[1] / frame.height)
+            if scale < 1.0:
+                frame = frame.resize((max(2, int(frame.width * scale)), max(2, int(frame.height * scale))),
+                                     Image.Resampling.LANCZOS)
+            fitted.append(frame)
+        return fitted
 
 
 CTRL = Controller()
@@ -204,6 +248,12 @@ def state_wait_enter(app, win):
     if not CTRL.keep_selection:
         CTRL.index = CTRL.default_index
     CTRL.apply(app)
+    player = CTRL.player
+    if player is not None:
+        if app.previous_picture is not player.still:
+            CTRL.player = None  # pibooth dropped the picture (delay elapsed, or forgotten)
+        else:
+            app.previous_animated = player.cycle  # also replaces pibooth's un-templated 'animate' frames
     CTRL.bar.invalidate()  # pibooth has just repainted the wait screen
     CTRL.draw(win)
 
@@ -257,22 +307,28 @@ def pibooth_setup_picture_factory(factory):
 
 
 @_plugin_hookimpl
-def state_processing_exit(cfg, app):
+def state_processing_exit(cfg, app, win):
     factory, CTRL.last_factory = CTRL.last_factory, None
+    CTRL.player = None
     if factory is None or factory.processed is None or factory.template.type not in MULTI_FRAME_TYPES:
         return
+    frames = media_frames(factory.template, factory.processed)
+    if len(frames) > 1:
+        CTRL.player = Player(app.previous_picture, Player.fit(frames, win.surface.get_size()),
+                             frame_delay(factory.template))
+        app.previous_animated = CTRL.player.cycle
     folders = cfg.gettuple('GENERAL', 'directory', 'path')
     stems = [media_stem(osp.join(folder, app.picture_filename)) for folder in folders]
-    thread = threading.Thread(target=_write_media, args=(factory.template, factory.processed, stems),
+    thread = threading.Thread(target=_write_media, args=(factory.template, factory.processed, stems, frames),
                               name='media-templates-output')
     thread.start()  # Not a daemon: a half written file is worse than a slow exit
     CTRL.threads = [t for t in CTRL.threads if t.is_alive()] + [thread]
 
 
-def _write_media(template, processed, stems):
+def _write_media(template, processed, stems, frames=None):
     started = time.time()
     try:
-        path = generate_media(template, processed, stems[0])
+        path = generate_media(template, processed, stems[0], frames)
         for stem in stems[1:]:
             shutil.copy(path, stem + osp.splitext(path)[1])
         LOGGER.info("Media templates: %s '%s' saved in %.1fs", template.type, osp.basename(path),
@@ -282,8 +338,44 @@ def _write_media(template, processed, stems):
 
 
 @_plugin_hookimpl
+def state_print_enter():
+    if CTRL.player is not None:
+        CTRL.player.restart()
+
+
+@_plugin_hookimpl
+def state_print_do(app, win):
+    if CTRL.player is not None and CTRL.player.due():
+        win.show_print(next(CTRL.player.cycle))
+        win.set_print_number(len(app.printer.get_all_tasks()), not app.printer.is_ready())
+
+
+@_plugin_hookimpl
+def state_print_validate(app, events):
+    CTRL.forgotten = bool(app.find_capture_event(events))  # as pibooth: a capture event forgets the picture
+    return None
+
+
+@_plugin_hookimpl(trylast=True)
+def state_finish_enter(cfg):
+    # pibooth shows the picture on the finish screen only if it is not forgotten
+    CTRL.finish_plays = (CTRL.player is not None and not CTRL.forgotten
+                         and cfg.getfloat('WINDOW', 'finish_picture_delay') > 0)
+    CTRL.forgotten = False
+    if CTRL.player is not None:
+        CTRL.player.restart()
+
+
+@_plugin_hookimpl
+def state_finish_do(win):
+    if CTRL.finish_plays and CTRL.player.due():
+        win.show_finished(next(CTRL.player.cycle))
+
+
+@_plugin_hookimpl
 def state_failsafe_enter():
     CTRL.reset_sequence()
+    CTRL.player = None
 
 
 @_plugin_hookimpl
