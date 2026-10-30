@@ -60,7 +60,8 @@ class Slot(object):
 
     """A rectangle of the canvas that receives one capture."""
 
-    def __init__(self, capture, x, y, width, height, rotation=0, fit='cover', background=None):
+    def __init__(self, capture, x, y, width, height, rotation=0, fit='cover', background=None, overlay=None):
+        self.overlay = overlay  # Transparent PNG stretched over this capture only
         self.capture = capture  # 0 based index of the capture
         self.x, self.y, self.width, self.height = x, y, width, height
         self.rotation = rotation
@@ -248,7 +249,8 @@ class Template(object):
         return Slot(capture - 1,
                     _dim(data.get('x', 0), width, what), _dim(data.get('y', 0), height, what),
                     _dim(data.get('w', 1.0), width, what), _dim(data.get('h', 1.0), height, what),
-                    float(data.get('rotation', 0)), fit, self._background(data.get('background')))
+                    float(data.get('rotation', 0)), fit, self._background(data.get('background')),
+                    self._path(data.get('overlay')))
 
     def _text(self, index, data):
         if not isinstance(data, dict) or 'text' not in data:

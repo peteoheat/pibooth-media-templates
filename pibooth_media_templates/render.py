@@ -347,6 +347,8 @@ def compose(template, processed, context=None, footer_texts=(), paper=None):
             if slot.capture >= len(processed):
                 continue
             tile = fit_image(processed[slot.capture], slot.width, slot.height, slot.fit)
+            if slot.overlay:  # Capture level: the frame follows the photo, including its rotation
+                tile = apply_overlay(tile, slot.overlay)
             if slot.rotation:
                 tile = tile.convert('RGBA').rotate(-slot.rotation, expand=True, resample=BICUBIC)
                 mask = tile

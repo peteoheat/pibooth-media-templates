@@ -72,7 +72,9 @@ texts:
 ```
 
 Numbers written as floats from 0 to 1 are a fraction of the canvas; whole numbers are pixels. A slot's
-`background` overrides the template's; `background: false` keeps the camera background for that slot. Text may use
+`background` overrides the template's; `background: false` keeps the camera background for that slot. A slot can also have its own `overlay`, a transparent
+PNG stretched over that capture only (it rotates with the photo); the template's `overlay` still covers the whole
+picture, on top. Text may use
 `{date}` (strftime formats allowed) and `{name}`. Without `slots` or `layout`, a template is "native": the capture
 itself is the picture (with overlay).
 
