@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.7
 
 * A slot can have its own `overlay`, a transparent PNG stretched over that capture only (it turns with a rotated
   slot). The template `overlay` still covers the whole picture, on top. The new Polaroids example uses both.
