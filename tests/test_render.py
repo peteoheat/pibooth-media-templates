@@ -98,6 +98,21 @@ def test_rotated_slot(tmp_path, photos):
     assert final.getpixel((5, 5)) == (0, 0, 0)  # corners stay canvas colour
 
 
+def test_slot_overlay_covers_its_capture_and_the_template_overlay_covers_all(tmp_path, photos):
+    Image.new('RGBA', (10, 10), (0, 255, 0, 255)).save(tmp_path / 'slot.png')
+    Image.new('RGBA', (10, 10), (0, 0, 0, 0)).save(tmp_path / 'clear.png')
+    text = ("type: collage\nsize: [800, 400]\ncanvas: {color: '#000000'}\n"
+            "slots:\n  - {capture: 1, x: 0, y: 0, w: 0.5, h: 1.0, overlay: slot.png}\n"
+            "  - {capture: 2, x: 0.5, y: 0, w: 0.5, h: 1.0}\n")
+    final, _ = render(make(tmp_path, text), photos[:2])
+    assert final.getpixel((200, 200)) == (0, 255, 0)   # the first capture only
+    assert final.getpixel((600, 200)) != (0, 255, 0)
+
+    Image.new('RGBA', (10, 10), (255, 0, 255, 255)).save(tmp_path / 'all.png')
+    final, _ = render(make(tmp_path, text + "overlay: all.png\n", name='u.yaml'), photos[:2])
+    assert final.getpixel((200, 200)) == (255, 0, 255)  # the whole-image overlay is on top
+
+
 # --- pibooth's [PICTURE] footer texts, and the template's own texts ---------
 
 FOOTER = [("London Science Museum", None, (255, 0, 0), 'center'),
