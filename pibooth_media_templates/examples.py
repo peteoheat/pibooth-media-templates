@@ -55,6 +55,24 @@ def _frame(size, color=(255, 255, 255, 255), width=None):
     return layer
 
 
+def _tape(size=(1200, 1800)):
+    """Whole-picture overlay: a strip of translucent tape across the top."""
+    layer = Image.new('RGBA', size, (0, 0, 0, 0))
+    ImageDraw.Draw(layer).rectangle((size[0] // 2 - 140, 10, size[0] // 2 + 140, 70), fill=(255, 214, 102, 190))
+    return layer
+
+
+def _polaroid(size, color=(255, 255, 255, 255), side=None, bottom=None):
+    """Transparent overlay with a thick bottom edge, like an instant photo."""
+    side = side or size[0] // 36
+    bottom = bottom or side * 3
+    layer = Image.new('RGBA', size, color)
+    hole = Image.new('L', size, 0)
+    ImageDraw.Draw(hole).rectangle((side, side, size[0] - side, size[1] - bottom), fill=255)
+    layer.putalpha(Image.eval(hole, lambda v: 255 - v))
+    return layer
+
+
 YAML = {}
 
 YAML['classic_single'] = """\
@@ -115,6 +133,18 @@ slots:                          # each slot can use its own replacement backgrou
 # the bottom sixth is left free for pibooth's footer text
 """
 
+YAML['polaroids'] = """name: Polaroids
+type: collage
+captures: 2
+size: [1200, 1800]
+canvas: {color: "#2b2b3a"}
+overlay: tape.png               # the whole picture: drawn last, over both photos
+slots:                          # a slot overlay frames that one capture and turns with it
+  - {capture: 1, x: 0.09, y: 0.05, w: 0.82, h: 0.34, rotation: -3, overlay: polaroid.png}
+  - {capture: 2, x: 0.09, y: 0.45, w: 0.82, h: 0.34, rotation: 3, overlay: polaroid.png}
+# the bottom sixth is left free for pibooth's footer text
+"""
+
 YAML['bounce'] = """\
 name: Bounce
 type: animation
@@ -149,6 +179,7 @@ def write_examples(folder, overwrite=False):
         'night_single': {'background.jpg': lambda: _night((1800, 1200)),
                          'frame.png': lambda: _frame((1800, 1200), (255, 214, 102, 255), 36)},
         'mixed_backgrounds': {'sunset.jpg': lambda: _sunset((1200, 800)), 'night.jpg': lambda: _night((1200, 800))},
+        'polaroids': {'polaroid.png': lambda: _polaroid((984, 612)), 'tape.png': _tape},
     }
     for key, text in YAML.items():
         target = osp.join(folder, key)

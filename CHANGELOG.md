@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+* A slot can have its own `overlay`, a transparent PNG stretched over that capture only (it turns with a rotated
+  slot). The template `overlay` still covers the whole picture, on top. The new Polaroids example uses both.
+
 ## 0.1.6
 
 * New `[MEDIA_TEMPLATES] print_size` / `print_dpi` / `print_fit`: pictures are made at the exact pixel size of the

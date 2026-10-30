@@ -66,7 +66,7 @@ def start(booth):
 
 
 def test_registers_against_pibooth_hookspecs_and_loads_examples(booth):
-    assert len(plugin.CTRL.templates) == 9
+    assert len(plugin.CTRL.templates) == 10
     assert osp.isdir(booth.cfg.getpath('MEDIA_TEMPLATES', 'templates_path'))
 
 

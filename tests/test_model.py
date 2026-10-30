@@ -13,7 +13,7 @@ def test_all_examples_load(examples):
     templates, errors = load_templates(str(examples))
     assert errors == []
     names = {t.name for t in templates}
-    assert {'Classic', 'Sunset', 'Night Sky', 'Photo Strip', 'Four Up', 'Two Worlds',
+    assert {'Classic', 'Sunset', 'Night Sky', 'Photo Strip', 'Four Up', 'Two Worlds', 'Polaroids',
             'Bounce', 'Wiggle', 'Reel'} == names
 
 
