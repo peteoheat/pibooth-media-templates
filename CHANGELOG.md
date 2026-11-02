@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.9
+
+* Fix: the `overlay` of a single-photo template is now laid on the full-size capture and cropped and scaled with it,
+  as slot overlays are, instead of being stretched to the cropped picture. Give it the camera's shape; a frame of a
+  different shape now has its edges cropped with the photo, where it used to be distorted.
+
 ## 0.1.8
 
 * Fix: a slot `overlay` is now laid on the full-size capture and cropped and scaled with it, instead of being

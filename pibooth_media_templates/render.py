@@ -317,19 +317,18 @@ def compose(template, processed, context=None, footer_texts=(), paper=None):
 
     if template.native:
         image = processed[0]
+        if template.overlay:  # Laid on the full-size capture, so it is cropped and scaled with it
+            image = apply_overlay(image, template.overlay)
         if template.size:
             image = fit_image(image, template.size[0], template.size[1], 'cover')
         elif paper is not None and paper.fit != 'contain':
-            # The photo fills the paper (in its own orientation), so the overlay and footer are laid out on
-            # the paper's shape and nothing is cropped or padded afterwards
+            # The photo fills the paper (in its own orientation); nothing is cropped or padded afterwards
             page = paper_pixels(paper, image.width >= image.height)
             if mode == 'band':
                 band = footer_height(template, page)
             image = fit_image(image, page[0], page[1] - band, 'cover')
         else:
             image = image.copy()
-        if template.overlay:
-            image = apply_overlay(image, template.overlay)
         if mode != 'off' and not band:
             band = footer_height(template, image.size)
         if mode == 'band':  # Extend the picture downwards: a frame overlay stays on the photo

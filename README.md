@@ -80,7 +80,8 @@ itself is the picture (with overlay).
 **Overlay and background sizes.** A slot's `overlay` is laid on the full-size capture, then the two are cropped and
 scaled into the slot together, so make it the same shape as the camera's pictures (16:9 for a 4608 x 2592 capture) and
 the overlay stays lined up with the photo; one of a different shape is stretched to fit. The template-level `overlay`
-is stretched to the whole picture (the paper's shape for a single photo), so give it that shape instead.
+of a single photo works the same way, so give it the camera's shape too. On a collage it is stretched to the whole
+canvas, so give it the canvas's shape.
 
 **Multi-frame types** write an extra file next to the picture, with the same name
 (`2026-10-27-14-03-11_pibooth.gif`):
@@ -171,8 +172,9 @@ print_fit = auto
 `print_size` is `postcard` (100 x 148 mm), `l` (89 x 119), `card` (54 x 86), `4x6`, `5x7`, `6x8` (inches), or
 `WIDTHxHEIGHT` in mm (`100x148`). Orientation follows the picture, so a landscape photo makes a landscape file.
 
-* A **single photo** fills the paper: it is cropped to the paper's shape first, and the frame overlay and footer text
-  are laid out on that shape, so nothing is cut off afterwards.
+* A **single photo** fills the paper: the overlay is laid on the full-size capture, then both are cropped to the paper's
+  shape together, so they stay lined up (an overlay's edges are cropped with the photo's). The footer text is laid out
+  on the paper's shape, so nothing is cut off afterwards.
 * A **collage** keeps the shape its template gives it. Within about 6% of the paper's shape (for example the 6 x 4 in
   Four Up) it is cropped slightly; a very different one (the 2 x 6 in Photo Strip) is centred on the canvas colour
   with margins at the sides, never stretched. Make a collage `size` match the paper to use all of it.

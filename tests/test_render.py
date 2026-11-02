@@ -125,6 +125,17 @@ def test_slot_overlay_is_cropped_with_the_capture_not_stretched(tmp_path):
     assert final.getpixel((5, 450)) == (128, 128, 128)       # stretched to the slot it would be green here
 
 
+def test_single_photo_overlay_is_cropped_with_the_capture_not_stretched(tmp_path):
+    capture = Image.new('RGB', (1600, 900), (128, 128, 128))
+    overlay = Image.new('RGBA', (1600, 900), (0, 0, 0, 0))
+    overlay.paste((0, 255, 0, 255), (0, 0, 100, 900))        # a strip on the left edge, cropped away
+    overlay.paste((255, 0, 255, 255), (700, 400, 900, 500))  # a patch at the centre
+    overlay.save(tmp_path / 'o.png')
+    final, _ = render(make(tmp_path, "type: single\nsize: [900, 900]\noverlay: o.png\n"), [capture])
+    assert final.getpixel((450, 450)) == (255, 0, 255)
+    assert final.getpixel((5, 450)) == (128, 128, 128)
+
+
 # --- pibooth's [PICTURE] footer texts, and the template's own texts ---------
 
 FOOTER = [("London Science Museum", None, (255, 0, 0), 'center'),
