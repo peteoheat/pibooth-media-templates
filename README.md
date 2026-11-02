@@ -73,10 +73,14 @@ texts:
 
 Numbers written as floats from 0 to 1 are a fraction of the canvas; whole numbers are pixels. A slot's
 `background` overrides the template's; `background: false` keeps the camera background for that slot. A slot can also have its own `overlay`, a transparent
-PNG stretched over that capture only (it rotates with the photo); the template's `overlay` still covers the whole
-picture, on top. Text may use
-`{date}` (strftime formats allowed) and `{name}`. Without `slots` or `layout`, a template is "native": the capture
+PNG for that capture only (it rotates with the photo); the template's `overlay` still covers the whole
+picture, on top. Text may use `{date}` (strftime formats allowed) and `{name}`. Without `slots` or `layout`, a template is "native": the capture
 itself is the picture (with overlay).
+
+**Overlay and background sizes.** A slot's `overlay` is laid on the full-size capture, then the two are cropped and
+scaled into the slot together, so make it the same shape as the camera's pictures (16:9 for a 4608 x 2592 capture) and
+the overlay stays lined up with the photo; one of a different shape is stretched to fit. The template-level `overlay`
+is stretched to the whole picture (the paper's shape for a single photo), so give it that shape instead.
 
 **Multi-frame types** write an extra file next to the picture, with the same name
 (`2026-10-27-14-03-11_pibooth.gif`):
