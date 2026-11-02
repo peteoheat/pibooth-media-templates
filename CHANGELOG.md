@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.8
+
+* Fix: a slot `overlay` is now laid on the full-size capture and cropped and scaled with it, instead of being
+  stretched to the already cropped slot. A 16:9 overlay no longer ends up squashed and out of line with the photo.
+
 ## 0.1.7
 
 * A slot can have its own `overlay`, a transparent PNG stretched over that capture only (it turns with a rotated

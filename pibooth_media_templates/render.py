@@ -346,9 +346,10 @@ def compose(template, processed, context=None, footer_texts=(), paper=None):
         for slot in template.slots_for(band if mode == 'band' else 0):
             if slot.capture >= len(processed):
                 continue
-            tile = fit_image(processed[slot.capture], slot.width, slot.height, slot.fit)
-            if slot.overlay:  # Capture level: the frame follows the photo, including its rotation
-                tile = apply_overlay(tile, slot.overlay)
+            source = processed[slot.capture]
+            if slot.overlay:  # Capture level: laid on the full-size capture, so it is cropped and scaled with it
+                source = apply_overlay(source, slot.overlay)
+            tile = fit_image(source, slot.width, slot.height, slot.fit)
             if slot.rotation:
                 tile = tile.convert('RGBA').rotate(-slot.rotation, expand=True, resample=BICUBIC)
                 mask = tile

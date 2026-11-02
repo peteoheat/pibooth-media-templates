@@ -113,6 +113,18 @@ def test_slot_overlay_covers_its_capture_and_the_template_overlay_covers_all(tmp
     assert final.getpixel((200, 200)) == (255, 0, 255)  # the whole-image overlay is on top
 
 
+def test_slot_overlay_is_cropped_with_the_capture_not_stretched(tmp_path):
+    capture = Image.new('RGB', (1600, 900), (128, 128, 128))
+    overlay = Image.new('RGBA', (1600, 900), (0, 0, 0, 0))
+    overlay.paste((0, 255, 0, 255), (0, 0, 100, 900))        # a strip on the left edge, cropped away by the slot
+    overlay.paste((255, 0, 255, 255), (700, 400, 900, 500))  # a patch at the centre
+    overlay.save(tmp_path / 'o.png')
+    text = ("type: collage\nsize: [900, 900]\nslots:\n  - {capture: 1, x: 0, y: 0, w: 1.0, h: 1.0, overlay: o.png}\n")
+    final, _ = render(make(tmp_path, text), [capture])
+    assert final.getpixel((450, 450)) == (255, 0, 255)
+    assert final.getpixel((5, 450)) == (128, 128, 128)       # stretched to the slot it would be green here
+
+
 # --- pibooth's [PICTURE] footer texts, and the template's own texts ---------
 
 FOOTER = [("London Science Museum", None, (255, 0, 0), 'center'),
