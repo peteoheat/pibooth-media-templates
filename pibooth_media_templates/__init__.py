@@ -182,7 +182,7 @@ def _install_draw(win):
         return
     original = win.draw
 
-    mode = os.environ.get('MEDIA_TEMPLATES_DEBUG', '')  # '1' traces; 'nobar' and 'norepaint' isolate a problem
+    mode = os.environ.get('MEDIA_TEMPLATES_DEBUG', '')  # '1' traces; 'nobar' leaves the bar out
     trace = [0] if mode else None
 
     def draw():
@@ -198,14 +198,14 @@ def _install_draw(win):
         if mode == 'nobar' or not (CTRL.active and CTRL.waiting and win.scene is not None
                                    and not win.is_menu_shown):
             return rects
-        if rects and mode != 'norepaint':
-            # Part of the screen was repainted, perhaps only a part of the bar: have the scene
-            # repaint the bar's area alone, so the bar is composed over a clean picture
-            area = pygame.Rect(CTRL.bar.rect(win.surface.get_size()))
-            if any(area.colliderect(rect) for rect in rects):
-                win.scene.sprites.repaint_rect(area)
-                rects = list(rects) + list(win.scene.sprites.draw(win.surface))
-                CTRL.bar.invalidate()
+        if rects:
+            if forced:
+                CTRL.bar.invalidate()  # the whole scene was repainted: the bar's backdrop is clean
+            elif any(pygame.Rect(CTRL.bar.rect(win.surface.get_size())).colliderect(rect) for rect in rects):
+                # Only a part of the bar was repainted. Never draw the scene twice in a frame (it blanks the
+                # first wait screen): have pibooth repaint it all on the next frame, and draw the bar then
+                win._force_redraw = True
+                return rects
         area = CTRL.draw(win)
         if area is not None:
             rects = list(rects) + [area]
