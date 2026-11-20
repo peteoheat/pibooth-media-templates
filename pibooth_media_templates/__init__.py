@@ -24,12 +24,18 @@ from PIL import Image
 try:
     import pygame
     import pibooth
-    from pibooth.utils import LOGGER, get_event_pos
+    from pibooth.utils import LOGGER
 except ImportError:  # Allow the command line tools to run without pibooth
     pibooth = None
     pygame = None
     import logging
     LOGGER = logging.getLogger("pibooth-media-templates")
+
+if pibooth is not None:
+    try:
+        from pibooth.evts import get_event_pos  # pibooth 3
+    except ImportError:
+        from pibooth.utils import get_event_pos  # pibooth 2
 
 from .model import load_templates, MULTI_FRAME_TYPES, TemplateError  # noqa: F401
 from .render import BackgroundReplacer, MediaTemplateFactory, default_context, parse_paper
@@ -37,7 +43,7 @@ from .media import generate_media, media_frames, frame_delay, media_stem
 from .ui import TemplateBar
 from .examples import write_examples
 
-__version__ = "0.1.9"
+__version__ = "0.1.10"
 
 SECTION = 'MEDIA_TEMPLATES'
 

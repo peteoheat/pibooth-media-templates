@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.10
+
+* Fix: the plugin did nothing under pibooth 3 (no templates, no `[MEDIA_TEMPLATES]` options): `get_event_pos` moved
+  from `pibooth.utils` to `pibooth.evts`, and the failed import silently turned every hook off.
+
 ## 0.1.9
 
 * Fix: the `overlay` of a single-photo template is now laid on the full-size capture and cropped and scaled with it,
