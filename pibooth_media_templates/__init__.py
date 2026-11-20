@@ -11,6 +11,7 @@ automatically. Background replacement uses ``pibooth-modnet`` when installed.
 See README.md for the template format.
 """
 
+import os
 import sys
 import inspect
 import os.path as osp
@@ -181,8 +182,18 @@ def _install_draw(win):
         return
     original = win.draw
 
+    trace = [0] if os.environ.get('MEDIA_TEMPLATES_DEBUG') else None
+
     def draw():
+        forced = getattr(win, '_force_redraw', None)
         rects = original()
+        if trace is not None and trace[0] < 80:
+            trace[0] += 1
+            sprites = win.scene.sprites.sprites() if win.scene is not None else []
+            LOGGER.info("Media templates trace #%d: scene=%s forced=%s rects=%d visible=%d/%d surface=%x "
+                        "waiting=%s menu=%s", trace[0], type(win.scene).__name__, forced, len(rects),
+                        sum(1 for s in sprites if s.visible), len(sprites), id(win.surface),
+                        CTRL.waiting, win.is_menu_shown)
         if not (CTRL.active and CTRL.waiting and win.scene is not None and not win.is_menu_shown):
             return rects
         if rects:
