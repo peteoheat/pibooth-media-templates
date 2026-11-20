@@ -251,16 +251,18 @@ class TemplateBar(object):
         return result
 
     def draw(self, pygame, win, selected):
-        """Draw the tiles over whatever is on the window, only when needed."""
+        """Draw the tiles over whatever is on the window, only when needed.
+        Return the Rect drawn, or None when nothing had to be drawn."""
         if not self.templates:
-            return
+            return None
         screen = win.surface
         area = pygame.Rect(self.rect(screen.get_size()))
         current = _tobytes(pygame, screen.subsurface(area))
         if self._composed is not None and current == self._composed and selected == self._drawn:
-            return  # Nothing changed since the tiles were drawn
+            return None  # Nothing changed since the tiles were drawn
         if self._backdrop is None or current != self._composed or self._backdrop.get_size() != area.size:
             self._backdrop = screen.subsurface(area).copy()  # pibooth repainted: take a new clean snapshot
         screen.blit(self._compose(pygame, self._backdrop, selected), area.topleft)
         self._composed = _tobytes(pygame, screen.subsurface(area))
         self._drawn = selected
+        return area

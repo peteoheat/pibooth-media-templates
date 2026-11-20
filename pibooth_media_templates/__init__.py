@@ -12,6 +12,7 @@ See README.md for the template format.
 """
 
 import sys
+import inspect
 import os.path as osp
 import shutil
 import itertools
@@ -43,7 +44,7 @@ from .media import generate_media, media_frames, frame_delay, media_stem
 from .ui import TemplateBar
 from .examples import write_examples
 
-__version__ = "0.1.10"
+__version__ = "0.1.11"
 
 SECTION = 'MEDIA_TEMPLATES'
 
@@ -77,6 +78,8 @@ class Controller(object):
         self.finish_plays = False
         self.paper = None         # Paper the pictures are fitted to, or None
         self.tapped = None       # index of the tile touched, until the wait state validates
+        self.waiting = False     # the wait state is active
+        self.deferred = False    # pibooth 3: the bar is drawn after the scene, from the window's draw()
 
     @property
     def active(self):
@@ -104,7 +107,8 @@ class Controller(object):
 
     def draw(self, win):
         if self.bar is not None and pygame is not None:
-            self.bar.draw(pygame, win, self.index)
+            return self.bar.draw(pygame, win, self.index)
+        return None
 
     def reset_sequence(self):
         self.session = None
@@ -160,6 +164,50 @@ class Player(object):
 
 
 CTRL = Controller()
+
+
+def _is_scene_window(win):
+    """True with pibooth 3, whose window is made of scenes and whose update() takes the events."""
+    try:
+        return 'events' in inspect.signature(win.update).parameters
+    except (TypeError, ValueError):
+        return False
+
+
+def _install_draw(win):
+    """pibooth 3 repaints only the sprites that changed, after the hooks have run: draw the bar
+    from the window's own draw() so that it ends up on top of the scene."""
+    if getattr(win, '_media_templates_draw', False) or not _is_scene_window(win):
+        return
+    original = win.draw
+
+    def draw():
+        rects = original()
+        if not (CTRL.active and CTRL.waiting and win.scene is not None and not win.is_menu_shown):
+            return rects
+        if rects:
+            # Part of the screen was repainted, perhaps only a part of the bar: repaint all
+            # of the scene so the bar is composed over a clean picture
+            rects = list(win.scene.draw(win.surface, True)) or rects
+            CTRL.bar.invalidate()
+        area = CTRL.draw(win)
+        if area is not None:
+            rects = list(rects) + [area]
+        return rects
+
+    win.draw = draw
+    win._media_templates_draw = True
+    CTRL.deferred = True
+
+
+def _show(win, frame, kind):
+    """Show one frame of the animated picture on the print or finish screen."""
+    if _is_scene_window(win):
+        win.scene.set_image(frame)
+    elif kind == 'print':
+        win.show_print(frame)
+    else:
+        win.show_finished(frame)
 
 
 # --------------------------------------------------------------------------
@@ -268,6 +316,8 @@ def state_wait_enter(app, win):
     CTRL.tapped = None
     if not CTRL.active:
         return
+    CTRL.waiting = True
+    _install_draw(win)
     if not CTRL.keep_selection:
         CTRL.index = CTRL.default_index
     CTRL.apply(app)
@@ -278,7 +328,8 @@ def state_wait_enter(app, win):
         else:
             app.previous_animated = player.cycle  # also replaces pibooth's un-templated 'animate' frames
     CTRL.bar.invalidate()  # pibooth has just repainted the wait screen
-    CTRL.draw(win)
+    if not CTRL.deferred:
+        CTRL.draw(win)
 
 
 def _is_tap(event):
@@ -310,7 +361,7 @@ def state_wait_do(app, win, events):
                 CTRL.step(1, app)
         _take_taps(win, events)
     yield
-    if CTRL.active:
+    if CTRL.active and not CTRL.deferred:
         CTRL.draw(win)
 
 
@@ -329,9 +380,11 @@ def state_wait_validate(cfg, app, win, events):
 
 @_plugin_hookimpl
 def state_wait_exit(win):
+    CTRL.waiting = False
     if CTRL.active:
         CTRL.session = CTRL.current
-        win.update()  # Repaint the wait screen to remove the bar
+        if not _is_scene_window(win):
+            win.update()  # Repaint the wait screen to remove the bar (pibooth 3 repaints the next scene)
 
 
 @_plugin_hookimpl(tryfirst=True)
@@ -388,8 +441,9 @@ def state_print_enter():
 @_plugin_hookimpl
 def state_print_do(app, win):
     if CTRL.player is not None and CTRL.player.due():
-        win.show_print(next(CTRL.player.cycle))
-        win.set_print_number(len(app.printer.get_all_tasks()), not app.printer.is_ready())
+        _show(win, next(CTRL.player.cycle), 'print')
+        if not _is_scene_window(win):
+            win.set_print_number(len(app.printer.get_all_tasks()), not app.printer.is_ready())
 
 
 @_plugin_hookimpl
@@ -411,11 +465,12 @@ def state_finish_enter(cfg):
 @_plugin_hookimpl
 def state_finish_do(win):
     if CTRL.finish_plays and CTRL.player.due():
-        win.show_finished(next(CTRL.player.cycle))
+        _show(win, next(CTRL.player.cycle), 'finish')
 
 
 @_plugin_hookimpl
 def state_failsafe_enter():
+    CTRL.waiting = False
     CTRL.reset_sequence()
     CTRL.player = None
 

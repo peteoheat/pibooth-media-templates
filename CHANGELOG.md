@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.11
+
+* Fix: pibooth 3 crashed ("Oops, something went wrong") when a template was chosen, because `win.update()` now takes
+  the events. The icon bar is now drawn from the window's own `draw()` after the scene, and the animated picture on
+  the print and finish screens is shown with `win.scene.set_image()`. pibooth 2 keeps its old calls.
+
 ## 0.1.10
 
 * Fix: the plugin did nothing under pibooth 3 (no templates, no `[MEDIA_TEMPLATES]` options): `get_event_pos` moved
