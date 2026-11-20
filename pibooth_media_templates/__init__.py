@@ -182,7 +182,8 @@ def _install_draw(win):
         return
     original = win.draw
 
-    trace = [0] if os.environ.get('MEDIA_TEMPLATES_DEBUG') else None
+    mode = os.environ.get('MEDIA_TEMPLATES_DEBUG', '')  # '1' traces; 'nobar' and 'norepaint' isolate a problem
+    trace = [0] if mode else None
 
     def draw():
         forced = getattr(win, '_force_redraw', None)
@@ -194,9 +195,10 @@ def _install_draw(win):
                         "waiting=%s menu=%s", trace[0], type(win.scene).__name__, forced, len(rects),
                         sum(1 for s in sprites if s.visible), len(sprites), id(win.surface),
                         CTRL.waiting, win.is_menu_shown)
-        if not (CTRL.active and CTRL.waiting and win.scene is not None and not win.is_menu_shown):
+        if mode == 'nobar' or not (CTRL.active and CTRL.waiting and win.scene is not None
+                                   and not win.is_menu_shown):
             return rects
-        if rects:
+        if rects and mode != 'norepaint':
             # Part of the screen was repainted, perhaps only a part of the bar: have the scene
             # repaint the bar's area alone, so the bar is composed over a clean picture
             area = pygame.Rect(CTRL.bar.rect(win.surface.get_size()))
