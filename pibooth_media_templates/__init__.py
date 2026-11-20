@@ -186,10 +186,13 @@ def _install_draw(win):
         if not (CTRL.active and CTRL.waiting and win.scene is not None and not win.is_menu_shown):
             return rects
         if rects:
-            # Part of the screen was repainted, perhaps only a part of the bar: repaint all
-            # of the scene so the bar is composed over a clean picture
-            rects = list(win.scene.draw(win.surface, True)) or rects
-            CTRL.bar.invalidate()
+            # Part of the screen was repainted, perhaps only a part of the bar: have the scene
+            # repaint the bar's area alone, so the bar is composed over a clean picture
+            area = pygame.Rect(CTRL.bar.rect(win.surface.get_size()))
+            if any(area.colliderect(rect) for rect in rects):
+                win.scene.sprites.repaint_rect(area)
+                rects = list(rects) + list(win.scene.sprites.draw(win.surface))
+                CTRL.bar.invalidate()
         area = CTRL.draw(win)
         if area is not None:
             rects = list(rects) + [area]
